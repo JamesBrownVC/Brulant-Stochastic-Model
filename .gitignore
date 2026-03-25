@@ -1,0 +1,13 @@
+__pycache__/
+*.json
+*.png
+!assets/*.png
+.vs/
+.claude/
+.idea/
+.vscode/
+
+# Legacy testing scripts
+plot_paths.py
+monitor_quicktest.py
+backtest_sandpile.py
