@@ -1,6 +1,6 @@
 <div align="center">
 
-# The Hook
+# INTRODUCTION
 **"The Brulant Model: A 4-Factor Stochastic Differential System for Crypto Microstructure & Liquidation Cascades."**
 
 </div>
