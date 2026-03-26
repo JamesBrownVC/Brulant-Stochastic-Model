@@ -1,110 +1,173 @@
 <div align="center">
 
-# INTRODUCTION
-**"The Brulant Model: A 4-Factor Stochastic Differential System for Crypto Microstructure & Liquidation Cascades."**
+# The Brulant Model
+
+**A Multi-Factor Stochastic Differential System for Cryptocurrency Microstructure**
+
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-proprietary-red.svg)]()
 
 </div>
 
+---
+
+## Quick Start
+
+```bash
+pip install numpy scipy requests matplotlib
+
+# Run the full benchmark comparison (v1.2 vs GBM, Heston, Merton, SABR)
+python benchmark_v12.py
+
+# Calibrate the v1.2 model on live Binance data
+python fit_nojump.py
+
+# Price digital options (60k-80k strikes, 0-4 day maturities)
+python validate_and_price.py
+
+# Generate all figures
+python generate_figures.py
+```
+
+---
+
 ## Overview
-Traditional quantitative models (Black-Scholes, Heston, Merton) were designed for low-volatility traditional equities. They operate on two fundamentally flawed assumptions when applied to modern digital assets: that price convergence to a "fair" value is continuous, and that volatility and market shocks are independent.
 
-The **Brulant Model** is a proprietary 4-factor Stochastic Differential Equation (SDE) system engineered specifically for the 24/7, hyper-leveraged, algorithmic reality of cryptocurrency markets.
+Traditional quantitative models (Black-Scholes, Heston, Merton) were designed for low-volatility equities. They fail on cryptocurrency because they assume continuous price convergence and independence between volatility and market shocks.
 
-### Core Innovations:
-* **Stochastic Drift:** Market mean-reversion is not linear. Convergence is a path-dependent struggle dictated by the physical tension of the order book (The Elasticity Buffer).
-* **The Sandpile Mechanic (Hidden Volatility):** The model intertwines the relationship between continuous volatility and jump probability. Periods of low volatility accumulate "hidden risk" (like sand on a pile), increasing the probability of a jump. When a jump fires, it violently injects volatility into the market but resets the jump probability, acting as a structural pressure release valve.
+The **Brulant Model** is a proprietary SDE system engineered for the 24/7, hyper-leveraged reality of crypto markets. It exists in two formulations:
 
----
-
-## 1. The Mathematics: The 4-Factor Coupled System
-The Brulant Model abandons 1D/2D simplifications to simulate a fully coupled, living order book. Every variable dynamically interacts with the others.
-
-### I. Price Dynamics & Stochastic Drift ($S_t$)
-The spot price follows a continuous diffusion process where the drift is not a static constant, but a stochastic variable actively fighting the market trend.
-
-$$ dS_t = \mu(B_t) S_t dt + \sigma_t S_t dW_t^S + S_{t-} (Y_t - 1) dN_t $$
-
-* $S_t$ **(Spot Price):** The current asset price.
-* $\mu(B_t)$ **(Stochastic Drift):** The continuous drift. Instead of a fixed annualized return, the drift is dynamically pulled back against the trend as order book tension ($B_t$) accumulates.
-* $\sigma_t$ **(Stochastic Volatility):** The continuous shaking of the asset.
-* $dW_t^S$ **(Brownian Motion):** The standard random walk component.
-* $dN_t$ **(Poisson Process Trigger):** The discrete jump event (liquidation cascade), governed by the dynamic intensity $\lambda_t$.
-* $Y_t$ **(Jump Magnitude):** The size and direction of the jump when $dN_t = 1$.
-
-### II. Volatility & The Jump Impact ($\sigma_t$)
-Volatility is a mean-reverting process, but it is deeply coupled to the jump mechanics.
-
-$$ d\sigma_t = \alpha (\sigma_0 - \sigma_t) dt + \xi \sigma_t dW_t^\sigma + \beta \sigma_{t-} dN_t $$
-
-* $\alpha, \sigma_0, \xi$: Standard mean-reversion speed, long-term variance, and the volatility of volatility.
-* $\beta$ **(Jump Impact Parameter):** When a jump occurs ($dN_t = 1$), it multiplies current volatility by a factor of $\beta$.
-
-**The Interaction:** A liquidation jump instantly shocks the market, spiking continuous volatility ($\sigma_t$). This creates the jagged, high-anxiety trading environment immediately following a crash.
-
-### III. Exhaustion Memory & The Sandpile Mechanic ($\lambda_t$ & $M_t$)
-This is the core behavioral engine of the model. Standard SDEs use a constant jump rate. The Brulant Model uses a non-linear, self-exciting intensity ($\lambda_t$) driven by Exhaustion Memory ($M_t$).
-
-**The Feedback Loop:**
-1. **Accumulation of Hidden Volatility:** When continuous volatility ($\sigma_t$) is low (a tight, ranging market), algorithmic tension builds up. The memory state ($M_t$) accumulates "sand." As $M_t$ rises, the probability of a jump ($\lambda_t$) aggressively increases. The quieter the market, the more dangerous it becomes.
-2. **The Pressure Release:** When the tension breaks and a jump fires ($dN_t = 1$), two things happen simultaneously: Volatility ($\sigma_t$) spikes, and the jump probability ($\lambda_t$) is instantly discharged/lowered. The sandpile has collapsed, liquidations are cleared, and the probability of another immediate jump drops, allowing the market to enter a high-volatility, but jump-free, recovery phase.
-
-### IV. The Elasticity Buffer & The Trapdoor ($B_t$)
-While $M_t$ dictates *when* a jump happens, the Elasticity Buffer ($B_t$) dictates *where* it goes. $B_t$ tracks the directional over-extension of the price.
-
-* **Tension Buildup:** As the price trends heavily in one direction, $B_t$ absorbs the returns, accumulating physical directional tension.
-* **The Trapdoor Effect ($\phi$):** When the Sandpile collapses and a jump is triggered, the mean direction of that jump ($jm$) is strictly dictated by the buffer:
-
-$$ jm = -\phi B_{t-} $$
-
-If the market has drifted unsustainably upward, $B_t$ is highly positive. The jump mean becomes violently negative, forcing the simulated price to snap downward. **This mathematically perfectly replicates late-longs being trapped and liquidated.**
+| | **v1.1** (Jump-Diffusion) | **v1.2** (Stochastic Mean-Reversion) |
+|---|---|---|
+| **Core mechanic** | Sandpile jump intensity + Elasticity Buffer | Stochastic vol target + Multi-layer buffers |
+| **OOS median loss** | 88.95 | **4.08** |
+| **Loss stability (std)** | 212.88 | **0.91** |
+| **Std ratio** | 1.434 | **1.194** |
+| **Best for** | Theoretical framework, liquidation modelling | Production pricing, calibration |
 
 ---
 
-## 2. Engineering & Stability (The Guardrails)
-Because the system relies on highly complex feedback loops (Jumps spike Volatility $\rightarrow$ Volatility drops Jump Probability $\rightarrow$ Returns build Tension $\rightarrow$ Tension dictates Jump Direction), it is naturally prone to mathematical explosion. This is mitigated through strict, production-grade regularization:
+## Benchmark Results
 
-#### Hard Truncations
-* **Fractional Returns:** Total return per timestep is hard-capped at `[-0.50, +0.50]`.
-* **Jump Magnitude:** Log-jumps are strictly clipped to `[-0.25, +0.25]`.
-* **Volatility Ceiling:** $\sigma_t$ is bounded to a hard ceiling of `5.0` to prevent geometric explosion when the $\beta$ impact triggers.
-
-#### Calibration via L2 Regularization
-Calibrated using the Simulated Method of Moments (SMM) and Differential Evolution (DE). Structural L2 penalties are applied to prevent over-fitting (e.g., punishing baseline jump intensity $\lambda_0 > 5.0$ or $\beta > 0.1$).
-
-**Result:** Out-of-sample Kurtosis reduced from an unstable $137,000$ to a bounded, realistic $0.029$, with Skew held cleanly at $-0.017$.
-
-#### Solving the Euler-Maruyama Leakage Problem
-Complex SDEs simulated via discrete time-stepping (Euler-Maruyama) notoriously suffer from "drift leakage," where compounding numerical errors slowly destroy the martingale property over thousands of steps. The Brulant Model actively solves this through the Elasticity Buffer ($B_t$). Because the buffer tracks directional over-extension, any artificial numerical drift immediately builds opposing tension. The model acts as a computationally self-correcting system, actively neutralizing discretization leakage and anchoring the 10,000-step mean to an unprecedented 0.009% accuracy margin against the starting spot.
-
----
-
-## 3. Empirical Validation: Benchmarking vs. Baseline Models
-To prove the structural superiority of the Elasticity Buffer, the 4-Factor Brulant Model was benchmarked against a baseline 3-Factor "Sandpile + Diffusion" model (which lacks the buffer and trapdoor mechanics).
-
-A massive 5,000-path, 10,000+ step Monte Carlo forward simulation (Euler-Maruyama) was executed over a 7-day window.
+Calibrated on 10,000 BTC/USDT 1-minute candles with 50/50 chronological train/test split:
 
 <div align="center">
 
-![Simulated Benchmark Paths](assets/benchmark_paths.png)
-*Visualizing 50 forward paths over 7 Days. Left: The restricted 3-Factor Model. Right: The dynamic 4-Factor Brulant Model.*
+![Benchmark Comparison](assets/benchmark_oos.png)
 
 </div>
 
-### The Baseline Failure (3-Factor Sandpile Model)
-* **Weekly Volatility:** 3.89% (Unrealistically low for Bitcoin). 
-* **90% Confidence Interval:** $67,351 to $75,158.
-* **The "Sniper" Problem:** Without the Elasticity Buffer, the 3-factor model failed to distribute risk organically. The central paths remained artificially flat and "asleep," punctuated by isolated, blind cliff-drops. The jumps had no awareness of the price's history, resulting in a chart that looked mathematically sterile rather than physically traded.
-
-### The Brulant Model Triumphs (4-Factor Coupled System)
-* **Weekly Volatility:** 8.59% (Accurately capturing the true underlying variance of the crypto tape).
-* **90% Confidence Interval:** $61,676 to $81,324 (A highly realistic +/- 14% weekly variance for BTC).
-* **Drift Conservation:** Starting Spot was $71,169; Model Mean after 5,000 paths was $71,176, perfectly conserving the martingale no-arbitrage property.
-* **The "Trench War" Reality:** The introduction of the Elasticity Buffer ($B_t$) completely transformed the distribution. Instead of random, blind drops, the paths fan out naturally. The model successfully generates continuous algorithmic chop, extended periods of low-volatility tension building, and violent, directional liquidation snaps (the Trapdoor) that actively fight the trend.
+| Model | Median OOS Loss | Loss Std | Std Ratio |
+|-------|:-:|:-:|:-:|
+| **Brulant v1.2** | **4.08** | **0.91** | **1.194** |
+| GBM (Black-Scholes) | 4.82 | 1.25 | 1.333 |
+| Heston | 4.89 | 1.03 | 1.283 |
+| Merton Jump-Diffusion | 4.85 | 5.54 | 1.063 |
+| SABR | 5.47 | 1.13 | 1.466 |
+| Brulant v1.1 | 88.95 | 212.88 | 1.434 |
 
 ---
 
-### Conclusion
-The benchmark definitively proves that standard jump-diffusion (even with memory) is insufficient for crypto microstructure. The Brulant Model's 4th factor successfully bridges the gap between stochastic calculus and behavioral order-book tension.
+## The Mathematics
 
-**Author:** James Brown-Brulant  
+### v1.2: Stochastic Mean-Reversion + Multi-Layer Buffers
+
+$$dS_t = \mu(B_t^{\text{eff}}) S_t \, dt + \sigma_t S_t \, dW_t^S$$
+
+$$d\sigma_t = \alpha(\bar{\sigma}_t - \sigma_t) \, dt$$
+
+$$d\bar{\sigma}_t = \alpha_s(\bar{\sigma}_0 - \bar{\sigma}_t) \, dt + \xi_s \, dW_t^{\bar{\sigma}}$$
+
+$$dB_t^{(k)} = -\kappa_k B_t^{(k)} \, dt + \theta_k \, d(\log S_t), \quad k \in \{\text{fast}, \text{slow}\}$$
+
+**Key innovations:**
+- **Two-layer vol hierarchy:** $\sigma_t$ tracks a wandering target $\bar{\sigma}_t$, which itself reverts to $\bar{\sigma}_0$. Generates vol-of-vol from diffusion alone.
+- **Multi-layer directional buffers:** Fast buffer ($\kappa = 95.7$, ~10 min half-life) captures intraday momentum. Slow buffer ($\kappa = 4.5$, ~56 day half-life) captures weekly trends. Optimizer weight: $w_{\text{slow}} = 0.56$.
+- **Self-correcting drift:** The buffer mechanism provides intrinsic Euler-Maruyama discretization correction (see [paper](paper/brulant_model_paper.tex), Theorem 3.1).
+
+### v1.1: Jump-Diffusion + Sandpile + Elasticity Buffer
+
+$$dS_t = \mu(B_t) S_t \, dt + \sigma_t S_t \, dW_t^S + S_{t-}(Y_t - 1) \, dN_t$$
+
+$$\lambda_t = \frac{\lambda_0}{\sigma_t + \varepsilon} e^{-M_t}$$
+
+**The Sandpile Mechanic:** Low volatility $\rightarrow$ high jump probability. Each jump resets the tension. The Elasticity Buffer dictates jump *direction*: $j_m = -\phi B_{t-}$.
+
+---
+
+## Digital Option Pricing
+
+<div align="center">
+
+![Pricing Surface](assets/pricing_surface.png)
+
+</div>
+
+Prices computed via Monte Carlo (100k-200k paths, 1-minute step resolution). Deep OTM wing comparison at +3 days:
+
+| Strike | v1.2 | v1.1 | GBM | Heston | Merton |
+|--------|:----:|:----:|:---:|:------:|:------:|
+| $78k | 0.96% | 2.47% | 1.48% | 0.06% | 0.35% |
+| $80k | 0.30% | 1.01% | 0.38% | **0.00%** | 0.06% |
+
+Heston and Merton kill the deep OTM wings entirely. v1.2 prices conservatively but non-zero.
+
+---
+
+## Simulated Paths
+
+<div align="center">
+
+![Path Comparison](assets/paths_comparison.png)
+
+</div>
+
+---
+
+## Project Structure
+
+```
+.
+├── backtest_buffer_model.py    # v1.1 simulation engine + calibration
+├── digital_option.py           # 3-factor sandpile simulation + pricing
+├── fit_sandpile.py             # SMM calibration framework
+├── experiment_v12.py           # v1.2 simulation engine (stoch vol + multi-buffer)
+├── fit_nojump.py               # v1.2 DE calibration
+├── benchmark_v12.py            # Head-to-head: v1.2 vs GBM, Heston, Merton, SABR
+├── benchmark_comparison.py     # v1.1 benchmark comparison
+├── validate_and_price.py       # 6-phase validation + digital option grid
+├── generate_figures.py         # Generate all repo figures
+├── forward_test_buffer.py      # Walk-forward OOS testing
+├── generate_repo_assets.py     # Original benchmark path visualization
+├── paper/
+│   └── brulant_model_paper.tex # Full working paper (proofs, analysis, results)
+├── assets/                     # Generated figures
+└── requirements.txt
+```
+
+## Requirements
+
+```
+numpy>=1.20.0
+scipy>=1.7.0
+requests>=2.25.0
+matplotlib>=3.5.0
+```
+
+Optional for GPU acceleration:
+```
+pip install torch --index-url https://download.pytorch.org/whl/cu124
+```
+
+---
+
+## Key Discovery
+
+At 1-minute resolution, standard jump intensities ($\lambda_0 \approx 1.2$) produce **~0.005 jumps per Monte Carlo path**. The entire jump mechanism---sandpile, trapdoor, memory---is structurally decorative at this timescale. This finding motivated the v1.2 reformulation and has implications for all jump-diffusion models applied to high-frequency crypto data.
+
+---
+
+**Author:** James Brown-Brulant
 **Status:** Production-Ready Monte Carlo Pricing Engine
+**Paper:** [`paper/brulant_model_paper.tex`](paper/brulant_model_paper.tex)
+</div>
