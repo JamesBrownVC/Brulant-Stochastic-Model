@@ -70,36 +70,35 @@ def fig1_benchmark_oos():
     colors = [COLORS["v12"], COLORS["gbm"], COLORS["heston"],
               COLORS["merton"], "#d2a8ff", COLORS["v11"]]
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 3.5))
 
     # Median loss
     bars = ax1.bar(range(len(models)), medians, color=colors, edgecolor="#30363d", linewidth=0.5)
     ax1.set_xticks(range(len(models)))
-    ax1.set_xticklabels(models, fontsize=9)
-    ax1.set_ylabel("Median OOS Loss")
-    ax1.set_title("Out-of-Sample Moment-Match Loss", fontweight="bold", fontsize=13)
+    ax1.set_xticklabels(models, fontsize=8)
+    ax1.set_ylabel("Median OOS Loss", fontsize=9)
+    ax1.set_title("OOS Moment-Match Loss", fontweight="bold", fontsize=10)
     for bar, val in zip(bars, medians):
-        ax1.text(bar.get_x() + bar.get_width()/2, val + 1.5, f"{val:.1f}",
-                ha="center", fontsize=9, color="#c9d1d9")
+        ax1.text(bar.get_x() + bar.get_width()/2, val + 1.0, f"{val:.1f}",
+                ha="center", fontsize=8, color="#c9d1d9")
     ax1.set_ylim(0, max(medians[:5]) * 1.4)
     ax1.grid(True, alpha=0.3, axis="y")
 
     # Loss stability (std)
     bars2 = ax2.bar(range(len(models)), stds, color=colors, edgecolor="#30363d", linewidth=0.5)
     ax2.set_xticks(range(len(models)))
-    ax2.set_xticklabels(models, fontsize=9)
-    ax2.set_ylabel("Loss Std (across seeds)")
-    ax2.set_title("Calibration Stability (lower = more reliable)", fontweight="bold", fontsize=13)
+    ax2.set_xticklabels(models, fontsize=8)
+    ax2.set_ylabel("Loss Std (across seeds)", fontsize=9)
+    ax2.set_title("Calibration Stability", fontweight="bold", fontsize=10)
     for bar, val in zip(bars2, stds):
         if val < 10:
-            ax2.text(bar.get_x() + bar.get_width()/2, val + 0.2, f"{val:.2f}",
-                    ha="center", fontsize=9, color="#c9d1d9")
+            ax2.text(bar.get_x() + bar.get_width()/2, val + 0.15, f"{val:.2f}",
+                    ha="center", fontsize=8, color="#c9d1d9")
     ax2.set_ylim(0, 8)
     ax2.grid(True, alpha=0.3, axis="y")
 
-    fig.suptitle("Brulant v1.2 vs Industry Benchmarks", fontsize=15, fontweight="bold", y=1.02)
     fig.tight_layout()
-    fig.savefig("assets/benchmark_oos.png", dpi=200, bbox_inches="tight")
+    fig.savefig("assets/benchmark_oos.png", dpi=120, bbox_inches="tight")
     plt.close(fig)
 
 
