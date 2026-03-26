@@ -30,7 +30,8 @@ try:
 
     @_njit(cache=True)
     def _buffer_core(n_steps, dt, num_paths, S0, mu0, sigma0, rho, nu, kappa,
-                     theta_p, alpha, beta, lambda0, gamma, eta, phi, sigma_Y, eps, seed):
+                     theta_p, alpha, beta, lambda0, gamma, eta, phi, sigma_Y, eps, seed,
+                     xi, delta):
         sqrt_dt = np.sqrt(dt)
         np.random.seed(seed % (2**31))
         S = np.full(num_paths, S0)
@@ -44,7 +45,7 @@ try:
                 lam = lambda0 / cs * np.exp(-M[i])
                 pj = min(lam * dt, 1.0)
                 jmp = 1.0 if np.random.random() < pj else 0.0
-                jm = -phi * B[i]
+                jm = -phi * B[i] + delta
                 jm = min(max(jm, -0.20), 0.20)
                 Y_val = jm + sigma_Y * np.random.randn()
                 Y_val = min(max(Y_val, -0.25), 0.25)
@@ -52,12 +53,13 @@ try:
                 dJ = (Y - 1.0) * jmp
                 dW = sqrt_dt * np.random.randn()
                 dWr = sqrt_dt * np.random.randn()
+                dW_sig = sqrt_dt * np.random.randn()
                 ret = mu0 * dt - rho * B[i] * dt - rho * nu * B[i] * dWr + cs * dW + dJ
                 ret = min(max(ret, -0.50), 0.50)
                 sp = S[i]
                 S[i] = max(sp * (1.0 + ret), 1e-12)
                 lr[i, t] = np.log(S[i] / sp)
-                sig[i] = min(max(cs + alpha * (sigma0 - cs) * dt + beta * jmp, eps), 5.0)
+                sig[i] = min(max(cs + alpha * (sigma0 - cs) * dt + xi * cs * dW_sig + beta * jmp, eps), 5.0)
                 M[i] = max(M[i] - gamma * M[i] * dt + eta * jmp, 0.0)
                 B[i] = B[i] - kappa * B[i] * dt + theta_p * ret
         return lr, S
@@ -88,12 +90,14 @@ def simulate_buffer_paths(
     sigma_Y: float = 0.10,
     eps: float = 1e-3,
     seed: Optional[int] = 42,
+    xi: float = 0.0,
+    delta: float = 0.0,
 ) -> Tuple[np.ndarray, np.ndarray]:
     if _HAS_NUMBA:
         s = int(seed) % (2**31) if seed is not None else 0
         return _buffer_core(n_steps, dt, num_paths, S0, mu0, sigma0, rho, nu,
                             kappa, theta_p, alpha, beta, lambda0, gamma, eta,
-                            phi, sigma_Y, eps, s)
+                            phi, sigma_Y, eps, s, xi, delta)
     rng = np.random.default_rng(seed)
     S = np.full(num_paths, S0, dtype=np.float64)
     sigma = np.full(num_paths, sigma0, dtype=np.float64)
@@ -107,13 +111,14 @@ def simulate_buffer_paths(
         p_jump = np.minimum(lambda_t * dt, 1.0)
         jump = (rng.random(num_paths) < p_jump).astype(np.float64)
 
-        jump_mean = np.clip(-phi * B, -0.20, 0.20)
+        jump_mean = np.clip(-phi * B + delta, -0.20, 0.20)
         jump_size = np.clip(rng.normal(jump_mean, sigma_Y), -0.25, 0.25)
         Y = np.exp(jump_size)
         dJ = (Y - 1.0) * jump
 
         dW = np.sqrt(dt) * rng.standard_normal(num_paths)
         dWr = np.sqrt(dt) * rng.standard_normal(num_paths)
+        dW_sig = np.sqrt(dt) * rng.standard_normal(num_paths)
 
         ret = (
             mu0 * dt
@@ -129,7 +134,12 @@ def simulate_buffer_paths(
         S = np.maximum(S, 1e-12)
         lr[:, t] = np.log(S / S_prev)
 
-        sigma = np.clip(current_sig + alpha * (sigma0 - current_sig) * dt + beta * jump, eps, 5.0)
+        sigma = np.clip(
+            current_sig + alpha * (sigma0 - current_sig) * dt
+            + xi * current_sig * dW_sig
+            + beta * jump,
+            eps, 5.0
+        )
         M = np.maximum(M - gamma * M * dt + eta * jump, 0.0)
         B = B - kappa * B * dt + theta_p * ret
 
