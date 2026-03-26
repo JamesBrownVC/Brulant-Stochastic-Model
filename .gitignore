@@ -1,13 +1,37 @@
 __pycache__/
-*.json
-*.png
-!assets/*.png
+*.pyc
+*.pyo
+
+# IDE / editor
 .vs/
 .claude/
 .idea/
 .vscode/
+*.sln
+*.pyproj
 
-# Legacy testing scripts
+# Output artifacts (regenerable)
+*.json
+*.png
+!assets/*.png
+!paper/*.png
+
+# LaTeX build artifacts
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.toc
+paper/*.bbl
+paper/*.blg
+paper/*.synctex.gz
+paper/*.fdb_latexmk
+paper/*.fls
+
+# Legacy testing scripts (kept out of tracked tree)
 plot_paths.py
 monitor_quicktest.py
 backtest_sandpile.py
+
+# OS files
+Thumbs.db
+.DS_Store
