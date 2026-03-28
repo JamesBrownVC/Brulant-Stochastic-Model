@@ -19,14 +19,19 @@ def main():
     returns_raw = fetch_binance_log_returns("BTCUSDT", "1m", 10000)
     dt = interval_to_dt_years("1m")
 
-    mu = np.median(returns_raw)
-    mad = np.percentile(np.abs(returns_raw - mu), 75) * 1.4826
-    returns = np.clip(returns_raw, mu - 5 * mad, mu + 5 * mad)
+    # 50/50 split BEFORE winsorization to prevent test data leaking into thresholds
+    n_half = len(returns_raw) // 2
+    train_r_raw, test_r_raw = returns_raw[:n_half], returns_raw[n_half:]
 
-    # 50/50 split
-    n_half = len(returns) // 2
-    train_r, test_r = returns[:n_half], returns[n_half:]
+    # Compute winsorization thresholds from TRAIN ONLY
+    mu = np.median(train_r_raw)
+    mad = np.percentile(np.abs(train_r_raw - mu), 75) * 1.4826
+    train_r = np.clip(train_r_raw, mu - 5 * mad, mu + 5 * mad)
+    test_r = np.clip(test_r_raw, mu - 5 * mad, mu + 5 * mad)
+    n_clipped_train = int(np.sum(train_r_raw != train_r))
+    n_clipped_test = int(np.sum(test_r_raw != test_r))
     print(f"Train: {train_r.size} | Test: {test_r.size} (50/50)")
+    print(f"Winsorized (train-derived thresholds): {n_clipped_train} train, {n_clipped_test} test")
 
     emp_train = moment_vector(train_r, w=None, acf_recent_bars=300)
     emp_test = moment_vector(test_r, w=None, acf_recent_bars=300)

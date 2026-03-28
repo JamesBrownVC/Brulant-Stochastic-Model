@@ -1,10 +1,12 @@
 """
 Brulant v1.2 (no-jump stoch-vol + 2-layer buffer) vs benchmarks.
 Digital option pricing comparison using MC.
+Includes paired significance tests (Wilcoxon, Diebold-Mariano, bootstrap CI).
 """
 import numpy as np
 import time
 import datetime
+from scipy import stats as sp_stats
 from experiment_v12 import simulate_v12
 from benchmark_comparison import (
     simulate_gbm, calibrate_gbm,
@@ -14,6 +16,35 @@ from benchmark_comparison import (
 )
 from fit_sandpile import fetch_binance_log_returns, interval_to_dt_years, moment_vector
 from backtest_buffer_model import simulate_buffer_paths, MOMENT_NAMES
+
+
+def diebold_mariano_test(losses_1, losses_2):
+    """Diebold-Mariano test for equal predictive accuracy.
+    H0: E[d_t] = 0 where d_t = L1_t - L2_t.
+    Returns (DM statistic, two-sided p-value).
+    """
+    d = np.array(losses_1) - np.array(losses_2)
+    n = len(d)
+    d_bar = np.mean(d)
+    # HAC variance (Newey-West with 0 lags for independent seeds)
+    var_d = np.var(d, ddof=1) / n
+    if var_d < 1e-20:
+        return 0.0, 1.0
+    dm_stat = d_bar / np.sqrt(var_d)
+    p_value = 2.0 * (1.0 - sp_stats.norm.cdf(abs(dm_stat)))
+    return float(dm_stat), float(p_value)
+
+
+def bootstrap_ci(data, n_bootstrap=10000, ci=0.95, seed=42):
+    """Bootstrap percentile confidence interval for the mean."""
+    rng = np.random.default_rng(seed)
+    data = np.asarray(data)
+    means = np.empty(n_bootstrap)
+    for i in range(n_bootstrap):
+        sample = rng.choice(data, size=len(data), replace=True)
+        means[i] = np.mean(sample)
+    alpha = (1 - ci) / 2
+    return float(np.percentile(means, 100 * alpha)), float(np.percentile(means, 100 * (1 - alpha)))
 
 # Fitted params from the DE calibration
 BRULANT_V12 = dict(
@@ -77,11 +108,16 @@ def main():
     print("\nFetching data for benchmark calibration...")
     returns_raw = fetch_binance_log_returns("BTCUSDT", "1m", 5000)
     dt = interval_to_dt_years("1m")
-    mu = np.median(returns_raw)
-    mad = np.percentile(np.abs(returns_raw - mu), 75) * 1.4826
-    returns = np.clip(returns_raw, mu - 5 * mad, mu + 5 * mad)
-    train_r = returns[:int(len(returns) * 0.5)]
-    test_r = returns[int(len(returns) * 0.5):]
+
+    # Split BEFORE winsorization; thresholds from train only (no test leakage)
+    n_split = int(len(returns_raw) * 0.5)
+    train_r_raw = returns_raw[:n_split]
+    test_r_raw = returns_raw[n_split:]
+    mu = np.median(train_r_raw)
+    mad = np.percentile(np.abs(train_r_raw - mu), 75) * 1.4826
+    train_r = np.clip(train_r_raw, mu - 5 * mad, mu + 5 * mad)
+    test_r = np.clip(test_r_raw, mu - 5 * mad, mu + 5 * mad)
+    print(f"  Winsorization: train-derived thresholds [{mu - 5*mad:.8f}, {mu + 5*mad:.8f}]")
 
     try:
         import requests
@@ -114,8 +150,9 @@ def main():
     print(f"  SABR: alpha={sabr_p['alpha_s']:.4f} nu={sabr_p['nu_s']:.4f}")
 
     # OOS moment match
+    N_SEEDS = 200
     print("\n" + "=" * 70)
-    print("  OOS MOMENT MATCH (10 seeds, frozen params)")
+    print(f"  OOS MOMENT MATCH ({N_SEEDS} seeds, frozen params)")
     print("=" * 70)
 
     model_configs = {
@@ -128,9 +165,11 @@ def main():
     }
 
     model_results = {}
+    model_loss_arrays = {}  # for paired tests
     for name, (tag, params) in model_configs.items():
+        t0 = time.perf_counter()
         losses = []
-        for i in range(10):
+        for i in range(N_SEEDS):
             seed = 42 + i * 77
             if tag == "v12":
                 lr, _ = simulate_v12(test_r.size, dt, 1000, seed=seed, S0=1.0, **BRULANT_V12)
@@ -164,22 +203,57 @@ def main():
         sp = lr.ravel()[:50000]
         sm = moment_vector(sp, w=None, acf_recent_bars=300)
         losses = np.array(losses)
+        model_loss_arrays[name] = losses
+
+        # Bootstrap SE of median
+        rng_bs = np.random.default_rng(42)
+        boot_medians = np.array([np.median(rng_bs.choice(losses, size=len(losses), replace=True))
+                                 for _ in range(10000)])
+        se_median = float(np.std(boot_medians))
+
         model_results[name] = {
             "med": float(np.median(losses)),
             "mean": float(np.mean(losses)),
             "std": float(np.std(losses)),
+            "se_median": se_median,
             "std_ratio": float(np.std(sp) / emp_std),
             "kurt": float(sm[3]),
             "skew": float(sm[2]),
             "tail3": float(np.mean(np.abs(sp) > 3 * np.std(sp)) / max(emp_3sig, 1e-12)),
         }
+        elapsed = time.perf_counter() - t0
+        print(f"  {name}: median={np.median(losses):.2f} SE(med)={se_median:.3f} ({elapsed:.1f}s)")
 
-    print(f"\n  {'Model':<18s} {'MedLoss':>8s} {'MeanLoss':>9s} {'LossStd':>8s} {'StdR':>6s} {'Kurt':>7s} {'Skew':>7s} {'3sig':>6s}")
-    print(f"  {'-'*18} {'-'*8} {'-'*9} {'-'*8} {'-'*6} {'-'*7} {'-'*7} {'-'*6}")
+    print(f"\n  {'Model':<18s} {'MedLoss':>8s} {'SE(med)':>8s} {'MeanLoss':>9s} {'LossStd':>8s} {'StdR':>6s} {'Kurt':>7s} {'Skew':>7s} {'3sig':>6s}")
+    print(f"  {'-'*18} {'-'*8} {'-'*8} {'-'*9} {'-'*8} {'-'*6} {'-'*7} {'-'*7} {'-'*6}")
     for name, r in model_results.items():
-        print(f"  {name:<18s} {r['med']:>8.2f} {r['mean']:>9.2f} {r['std']:>8.2f} "
+        print(f"  {name:<18s} {r['med']:>8.2f} {r['se_median']:>8.3f} {r['mean']:>9.2f} {r['std']:>8.2f} "
               f"{r['std_ratio']:>6.3f} {r['kurt']:>7.1f} {r['skew']:>7.3f} {r['tail3']:>6.3f}")
-    print(f"  {'EMPIRICAL':<18s} {'---':>8s} {'---':>9s} {'---':>8s} {'1.000':>6s} {emp[3]:>7.1f} {emp[2]:>7.3f} {'1.000':>6s}")
+    print(f"  {'EMPIRICAL':<18s} {'---':>8s} {'---':>8s} {'---':>9s} {'---':>8s} {'1.000':>6s} {emp[3]:>7.1f} {emp[2]:>7.3f} {'1.000':>6s}")
+
+    # ===== PAIRED SIGNIFICANCE TESTS (v1.2 vs each benchmark) =====
+    print("\n" + "=" * 70)
+    print("  PAIRED SIGNIFICANCE TESTS (Brulant v1.2 vs each model)")
+    print("=" * 70)
+    v12_losses = model_loss_arrays["Brulant v1.2"]
+    print(f"\n  {'Benchmark':<18s} {'MedDiff':>8s} {'95% CI':>22s} {'Wilcoxon p':>11s} {'DM stat':>8s} {'DM p':>8s}")
+    print(f"  {'-'*18} {'-'*8} {'-'*22} {'-'*11} {'-'*8} {'-'*8}")
+    for name in model_configs:
+        if name == "Brulant v1.2":
+            continue
+        bench_losses = model_loss_arrays[name]
+        # Paired differences: positive means benchmark is worse (v1.2 wins)
+        diffs = bench_losses - v12_losses
+        med_diff = float(np.median(diffs))
+        ci_lo, ci_hi = bootstrap_ci(diffs, n_bootstrap=10000, ci=0.95, seed=42)
+        # Wilcoxon signed-rank test (H0: median difference = 0)
+        try:
+            w_stat, w_pval = sp_stats.wilcoxon(diffs, alternative='two-sided')
+        except ValueError:
+            w_stat, w_pval = float('nan'), float('nan')
+        dm_stat, dm_pval = diebold_mariano_test(bench_losses, v12_losses)
+        sig = " ***" if w_pval < 0.001 else (" **" if w_pval < 0.01 else (" *" if w_pval < 0.05 else ""))
+        print(f"  {name:<18s} {med_diff:>+8.2f} [{ci_lo:>+9.2f}, {ci_hi:>+9.2f}] {w_pval:>11.4g} {dm_stat:>+8.2f} {dm_pval:>8.4g}{sig}")
 
     # ===== DIGITAL OPTION PRICING =====
     print("\n" + "=" * 70)

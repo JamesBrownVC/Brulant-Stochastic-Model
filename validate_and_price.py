@@ -66,6 +66,15 @@ def winsorize_returns(r: np.ndarray, n_sigma: float = 5.0) -> np.ndarray:
     return np.clip(r, lo, hi)
 
 
+def winsorize_thresholds(r: np.ndarray, n_sigma: float = 5.0) -> tuple:
+    """Compute winsorization thresholds from r (meant for training data only)."""
+    mu = np.median(r)
+    sigma = np.percentile(np.abs(r - mu), 75) * 1.4826
+    lo = mu - n_sigma * sigma
+    hi = mu + n_sigma * sigma
+    return lo, hi
+
+
 # ============================================================================
 #  PHASE 1: Fresh Calibration
 # ============================================================================
@@ -85,15 +94,18 @@ def phase1_calibration(
     print("PHASE 1: FRESH CALIBRATION ON LIVE DATA")
     print("=" * 70)
 
-    train_r, test_r = split_train_test(returns, train_frac)
+    train_r_raw, test_r = split_train_test(returns, train_frac)
 
-    # Winsorize to prevent extreme kurtosis from dominating calibration
-    train_r_w = winsorize_returns(train_r, 5.0)
-    n_clipped = int(np.sum(train_r != train_r_w))
+    # Winsorize using thresholds derived from TRAIN ONLY (no test leakage)
+    lo, hi = winsorize_thresholds(train_r_raw, 5.0)
+    train_r_w = np.clip(train_r_raw, lo, hi)
+    test_r = np.clip(test_r, lo, hi)  # apply same thresholds to test
+    n_clipped_train = int(np.sum(train_r_raw != train_r_w))
+    n_clipped_test = int(np.sum(test_r != np.clip(test_r, lo, hi)))  # already clipped
 
     print(f"  Data: {returns.size} total returns")
-    print(f"  Train: {train_r.size} bars | Test: {test_r.size} bars")
-    print(f"  Winsorized {n_clipped} extreme returns in training set")
+    print(f"  Train: {train_r_raw.size} bars | Test: {test_r.size} bars")
+    print(f"  Winsorized {n_clipped_train} extreme returns (train-derived thresholds)")
 
     # Compute raw moments for reporting
     raw_moments = moment_vector(train_r, w=None, acf_recent_bars=acf_recent)
@@ -122,26 +134,15 @@ def phase1_calibration(
     # Evaluate on raw (un-winsorized) test data
     ev = evaluate_test(params, test_r, dt, max(800, paths), seed + 7, acf_recent)
 
-    # Check if calibration is acceptable
-    acceptable = ev["test_loss"] < 50.0  # generous threshold
-
     print(f"\n  Calibration completed in {elapsed_fit:.1f}s")
     print(f"  Train loss: {fit['loss']:.4f}")
     print(f"  Test loss:  {ev['test_loss']:.4f}")
     print(f"  Ratio (test/train): {ev['test_loss']/max(fit['loss'],1e-12):.2f}x")
 
-    if not acceptable:
-        print(f"\n  *** TEST LOSS TOO HIGH ({ev['test_loss']:.2f}). Testing known-good parameters... ***")
-        ev_known = evaluate_test(KNOWN_GOOD_PARAMS, test_r, dt, max(800, paths), seed + 7, acf_recent)
-        print(f"  Known-good params test loss: {ev_known['test_loss']:.4f}")
-
-        if ev_known["test_loss"] < ev["test_loss"]:
-            print(f"  *** USING KNOWN-GOOD PARAMETERS (loss {ev_known['test_loss']:.4f} < {ev['test_loss']:.4f}) ***")
-            params = dict(KNOWN_GOOD_PARAMS)
-            ev = ev_known
-            fit["loss"] = float('nan')  # mark as replaced
-        else:
-            print(f"  Fresh calibration still better, keeping fresh params.")
+    if ev["test_loss"] > 50.0:
+        print(f"\n  *** WARNING: Test loss high ({ev['test_loss']:.2f}). "
+              f"Calibration may be unstable on this data window. ***")
+        print(f"  *** Reporting honestly -- NO parameter substitution. ***")
 
     print("\n  Final parameters:")
     for k, v in params.items():
@@ -156,10 +157,9 @@ def phase1_calibration(
         "fit": fit,
         "params": params,
         "eval": ev,
-        "train_r": train_r,
+        "train_r": train_r_raw,
         "test_r": test_r,
         "elapsed_s": elapsed_fit,
-        "used_known_good": not acceptable and KNOWN_GOOD_PARAMS == params,
     }
 
 
@@ -178,50 +178,101 @@ def phase2_walk_forward(
     paths: int = 500,
     maxiter: int = 6,
     seed: int = 42,
+    expanding: bool = True,
 ) -> Dict[str, Any]:
-    """Rolling walk-forward: recalibrate on each fold, freeze on test."""
+    """Walk-forward: expanding-window (default) or rolling, with non-overlapping test sets.
+
+    expanding=True (default): train grows each fold, test sets never overlap.
+    expanding=False: fixed train_size, step_size controls overlap.
+    """
     print("\n" + "=" * 70)
-    print("PHASE 2: WALK-FORWARD PARAMETER STABILITY")
+    mode = "EXPANDING-WINDOW" if expanding else "ROLLING"
+    print(f"PHASE 2: {mode} WALK-FORWARD PARAMETER STABILITY")
     print("=" * 70)
 
     r = np.asarray(returns, dtype=np.float64).ravel()
-    # Winsorize the entire series for consistent calibration
-    r = winsorize_returns(r, 5.0)
 
     folds: List[Dict[str, Any]] = []
-    start = 0
     fold_id = 0
 
-    while start + train_size + test_size <= r.size:
-        train_r = r[start:start + train_size]
-        test_r = r[start + train_size:start + train_size + test_size]
+    if expanding:
+        # Expanding window: anchor at start, non-overlapping test sets
+        test_start = train_size
+        while test_start + test_size <= r.size:
+            train_r_raw = r[:test_start]  # grows each fold
+            test_r_raw = r[test_start:test_start + test_size]
+            # Winsorize per-fold using TRAIN-ONLY thresholds
+            lo, hi = winsorize_thresholds(train_r_raw, 5.0)
+            train_r = np.clip(train_r_raw, lo, hi)
+            test_r = np.clip(test_r_raw, lo, hi)
 
-        fit = fit_buffer_model(
-            train_r, dt,
-            half_life_bars=half_life,
-            acf_recent_bars=acf_recent,
-            num_paths=paths,
-            maxiter=maxiter,
-            seed=seed + fold_id,
-        )
+            fit = fit_buffer_model(
+                train_r, dt,
+                half_life_bars=half_life,
+                acf_recent_bars=acf_recent,
+                num_paths=paths,
+                maxiter=maxiter,
+                seed=seed + fold_id,
+            )
 
-        params = {k: fit[k] for k in [
-            "mu0", "sigma0", "rho", "nu", "kappa", "theta_p",
-            "alpha", "beta", "lambda0", "gamma", "eta", "phi", "sigma_Y", "eps"
-        ]}
+            params = {k: fit[k] for k in [
+                "mu0", "sigma0", "rho", "nu", "kappa", "theta_p",
+                "alpha", "beta", "lambda0", "gamma", "eta", "phi", "sigma_Y", "eps"
+            ]}
 
-        ev = evaluate_test(params, test_r, dt, max(500, paths), seed + 1000 + fold_id, acf_recent)
+            ev = evaluate_test(params, test_r, dt, max(500, paths), seed + 1000 + fold_id, acf_recent)
 
-        fold_data = {
-            "fold": fold_id,
-            "train_loss": float(fit["loss"]),
-            "test_loss": float(ev["test_loss"]),
-            "params": {k: float(v) for k, v in params.items()},
-        }
-        folds.append(fold_data)
-        print(f"  Fold {fold_id}: train_loss={fit['loss']:.4f}  test_loss={ev['test_loss']:.4f}")
-        fold_id += 1
-        start += step_size
+            fold_data = {
+                "fold": fold_id,
+                "train_size": train_r.size,
+                "test_start": int(test_start),
+                "test_end": int(test_start + test_size),
+                "train_loss": float(fit["loss"]),
+                "test_loss": float(ev["test_loss"]),
+                "params": {k: float(v) for k, v in params.items()},
+            }
+            folds.append(fold_data)
+            print(f"  Fold {fold_id}: train=[0:{test_start}] test=[{test_start}:{test_start+test_size}] "
+                  f"train_loss={fit['loss']:.4f}  test_loss={ev['test_loss']:.4f}")
+            fold_id += 1
+            test_start += test_size  # non-overlapping test sets
+
+    else:
+        # Original rolling window (kept for backwards compatibility)
+        start = 0
+        while start + train_size + test_size <= r.size:
+            train_r_raw = r[start:start + train_size]
+            test_r_raw = r[start + train_size:start + train_size + test_size]
+            lo, hi = winsorize_thresholds(train_r_raw, 5.0)
+            train_r = np.clip(train_r_raw, lo, hi)
+            test_r = np.clip(test_r_raw, lo, hi)
+
+            fit = fit_buffer_model(
+                train_r, dt,
+                half_life_bars=half_life,
+                acf_recent_bars=acf_recent,
+                num_paths=paths,
+                maxiter=maxiter,
+                seed=seed + fold_id,
+            )
+
+            params = {k: fit[k] for k in [
+                "mu0", "sigma0", "rho", "nu", "kappa", "theta_p",
+                "alpha", "beta", "lambda0", "gamma", "eta", "phi", "sigma_Y", "eps"
+            ]}
+
+            ev = evaluate_test(params, test_r, dt, max(500, paths), seed + 1000 + fold_id, acf_recent)
+
+            fold_data = {
+                "fold": fold_id,
+                "train_loss": float(fit["loss"]),
+                "test_loss": float(ev["test_loss"]),
+                "params": {k: float(v) for k, v in params.items()},
+            }
+            folds.append(fold_data)
+            print(f"  Fold {fold_id}: train_loss={fit['loss']:.4f}  test_loss={ev['test_loss']:.4f}")
+            fold_id += 1
+            start += step_size
 
     if not folds:
         print("  WARNING: Not enough data for walk-forward. Skipping.")
@@ -692,10 +743,9 @@ def main():
         "spot": S0,
         "n_returns": int(returns.size),
         "phase1": {
-            "train_loss": float(p1["fit"]["loss"]) if np.isfinite(p1["fit"]["loss"]) else "replaced_by_known_good",
+            "train_loss": float(p1["fit"]["loss"]),
             "test_loss": float(p1["eval"]["test_loss"]),
             "params": {k: float(v) for k, v in p1["params"].items()},
-            "used_known_good": p1.get("used_known_good", False),
             "test_moments_emp": p1["eval"]["test_emp"].tolist(),
             "test_moments_sim": p1["eval"]["test_sim"].tolist(),
         },
@@ -715,10 +765,7 @@ def main():
     print("=" * 70)
     print(f"  Spot: ${S0:,.2f}")
     train_loss = p1["fit"]["loss"]
-    if np.isfinite(train_loss):
-        print(f"  Train loss: {train_loss:.4f}")
-    else:
-        print(f"  Train loss: N/A (used known-good params)")
+    print(f"  Train loss: {train_loss:.4f}")
     print(f"  Test loss:  {p1['eval']['test_loss']:.4f}")
     if p2.get("folds"):
         s = p2["summary"]

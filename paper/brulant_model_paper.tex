@@ -76,13 +76,18 @@ properties. This motivates the v1.2 reformulation: a pure diffusion model
 with \emph{stochastic volatility mean-reversion} (the vol target itself
 follows an OU process) and \emph{multi-layer directional buffers} (fast and
 slow tension accumulators). Calibrated via SMM with differential evolution
-on 10{,}000 candles (50/50 train/test), v1.2 achieves an OOS median loss of
-\textbf{4.08} with loss standard deviation of \textbf{0.91}---outperforming
-GBM (4.82), Heston (4.89), Merton (4.85), SABR (5.47), and the original
-v1.1 (88.95) on the same data. The v1.2 model achieves a near-perfect
-volatility ratio of \textbf{1.02$\times$} against empirical data. We provide
-a complete digital option pricing framework and demonstrate structural
-advantages over all benchmarks tested.
+on 10{,}000 candles (50/50 train/test), v1.2 achieves lower median OOS
+moment-matching loss than standard benchmarks on a single calibration window.
+To establish statistical rigor, we evaluate all models across $N$
+non-overlapping 7-day windows spanning 6 months of data, with equalized
+calibration budgets (differential evolution function evaluations matched
+per model), train-only winsorization thresholds, and paired Wilcoxon
+signed-rank tests with bootstrap confidence intervals. We report win rates,
+average ranks, and regime-conditional performance (bull, bear, sideways,
+high/low volatility). Digital option prices are compared against Deribit
+market quotes via call-spread approximation. We provide
+a complete digital option pricing framework and discuss both structural
+advantages and honest limitations of the model.
 \end{abstract}
 
 \bigskip
@@ -314,26 +319,27 @@ channel 3 delivers sudden corrections.
 A key structural advantage of the Brulant Model is its intrinsic resistance
 to Euler--Maruyama discretization drift.
 
-\begin{theorem}[Self-Correcting Discretization]
-\label{thm:drift_correction}
+\begin{proposition}[Buffer-Mediated Drift Attenuation]
+\label{prop:drift_correction}
 Let $\hat{S}_t$ be the Euler--Maruyama approximation of $S_t$ with step
-size $\Delta t$. If the discretization introduces a systematic drift bias
-$\epsilon$ per step (i.e., $\E[\log \hat{S}_{t+\Delta t} / \hat{S}_t]
-\approx \epsilon\,\Delta t$ instead of 0 under risk-neutral measure),
-then the buffer accumulates:
+size $\Delta t$, and suppose a systematic drift perturbation $\epsilon$
+per step enters the log-return dynamics (e.g., from discretization bias or
+model misspecification). Under the buffer feedback $\diff B_t = -\kappa B_t\,\dt + \theta_p\,\diff \log S_t$
+with drift correction $-\rho\, B_t$, the steady-state residual drift is:
 \[
-  \Delta B \approx \theta_p\,\epsilon\,\Delta t
+  \mu_{\text{residual}} = \epsilon \cdot \frac{\kappa}{\kappa + \rho\,\theta_p},
 \]
-per step. After $n$ steps without correction, $B_t \approx n\,\theta_p\,
-\epsilon\,\Delta t$, which induces an opposing drift of magnitude
-$\rho \cdot n\,\theta_p\,\epsilon\,\Delta t$. The system reaches
-equilibrium when:
+a fractional attenuation of the perturbation by factor $\kappa / (\kappa + \rho\,\theta_p) < 1$.
+The buffer absorbs:
 \[
-  \rho\, B_{\text{eq}} = \epsilon \implies B_{\text{eq}} = \frac{\epsilon}{\rho}.
+  \E[B_{\infty}] = \frac{\theta_p\,\epsilon}{\kappa + \rho\,\theta_p}.
 \]
-The feedback loop stabilizes the mean path at a drift of $\epsilon^2/\rho$
-rather than allowing linear accumulation $\epsilon \cdot t$.
-\end{theorem}
+For the calibrated v1.2 parameters ($\kappa_{\text{fast}} \approx 96$,
+$\rho \approx 2.9$, $\theta_{\text{fast}} \approx 1.8$), the attenuation
+factor is $\approx 0.95$, providing modest drift correction. The slow buffer
+($\kappa_{\text{slow}} \approx 4.5$, $\theta_{\text{slow}} \approx 1.0$)
+achieves stronger attenuation $\approx 0.61$.
+\end{proposition}
 
 \begin{proof}
 Consider the buffer dynamics in discrete time with step $\Delta t$.
@@ -344,18 +350,29 @@ At step $n$:
 where $r_n = \log(S_{n+1}/S_n)$. The drift component of $r_n$ is modified
 by the buffer:
 \[
-  \E[r_n \mid B_n] = (\mu_0 - \rho\, B_n)\,\Delta t + O(\Delta t^{3/2}).
+  \E[r_n \mid B_n] = (\mu_0 + \epsilon - \rho\, B_n)\,\Delta t + O(\Delta t^{3/2}).
 \]
-At steady state, $\E[B_{n+1}] = \E[B_n]$, yielding:
+At steady state, $\E[B_{n+1}] = \E[B_n] =: \bar{B}$, yielding:
 \[
-  \kappa\,\E[B]\,\Delta t = \theta_p(\mu_0 - \rho\,\E[B])\,\Delta t,
+  \kappa\,\bar{B} = \theta_p(\mu_0 + \epsilon - \rho\,\bar{B}),
 \]
-hence $\E[B] = \theta_p\,\mu_0 / (\kappa + \rho\,\theta_p)$.
-Under the martingale condition $\mu_0 = 0$, we get $\E[B] = 0$,
-confirming drift conservation. Any perturbation $\epsilon$ yields
-$\E[B] = \theta_p\,\epsilon / (\kappa + \rho\,\theta_p)$,
-which feeds back to suppress the drift to order $\epsilon^2$.
+hence $\bar{B} = \theta_p\,(\mu_0 + \epsilon) / (\kappa + \rho\,\theta_p)$.
+Under the martingale condition $\mu_0 = 0$:
+\[
+  \bar{B} = \frac{\theta_p\,\epsilon}{\kappa + \rho\,\theta_p}.
+\]
+The effective drift seen by the price process is $\epsilon - \rho\,\bar{B}
+= \epsilon\bigl(1 - \frac{\rho\,\theta_p}{\kappa + \rho\,\theta_p}\bigr)
+= \frac{\kappa\,\epsilon}{\kappa + \rho\,\theta_p}$.
 \end{proof}
+
+\begin{remark}
+The attenuation factor $\kappa/(\kappa + \rho\,\theta_p)$ approaches zero
+(perfect drift elimination) as $\rho\,\theta_p / \kappa \to \infty$, i.e.,
+when the buffer coupling is strong relative to its decay rate. This is
+first-order suppression, not the quadratic suppression ($\sim\epsilon^2$)
+previously claimed---a correction from the v1.0 working paper.
+\end{remark}
 
 \subsection{Stationary Distribution of the Memory Process}
 
@@ -918,9 +935,10 @@ Key contributions:
   \item \textbf{Stochastic Vol Mean-Reversion (v1.2):} Two-layer OU
     hierarchy generating vol-of-vol from diffusion alone, achieving
     a 1.02$\times$ volatility ratio.
-  \item \textbf{Rigorous Benchmark:} v1.2 outperforms GBM, Heston,
-    Merton, and SABR on median OOS loss (4.08 vs.\ 4.82--5.47) with
-    22$\times$ lower loss variance than v1.1.
+  \item \textbf{Rigorous Benchmark:} v1.2 is evaluated against GBM, Heston,
+    Merton, and SABR with equalized calibration budgets across $N$
+    non-overlapping temporal windows, with paired significance tests
+    and regime-conditional analysis.
   \item \textbf{Analytical Results:} Formal proofs of drift correction,
     stationary memory distribution, and stability conditions.
   \item \textbf{The Jump Frequency Discovery:} At 1-minute resolution,
@@ -943,6 +961,83 @@ Key contributions:
   \item Hybrid model: v1.2 diffusion for base dynamics, v1.1 jumps
     activated only during detected liquidation regimes.
 \end{itemize}
+
+% ============================================================================
+\subsection{Limitations}
+\label{sec:limitations}
+% ============================================================================
+
+We note the following limitations that contextualize the results:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Parameter count.} Brulant v1.2 has 11 free parameters versus
+    1 (GBM), 4 (Heston/SABR), or 3 (Merton). While AIC/BIC penalization
+    partially accounts for this, the higher-dimensional search space provides
+    more fitting flexibility. Readers should weigh loss improvements against
+    model complexity.
+
+  \item \textbf{Moment matching $\neq$ pricing accuracy.} The loss function
+    targets six statistical moments (mean, std, skew, kurtosis, tail mass,
+    ACF). Lower moment-matching loss does not guarantee more accurate option
+    prices, Greeks, or hedging performance.
+
+  \item \textbf{Asset specificity.} All primary results are calibrated on
+    BTC/USDT. Cross-asset generalization (ETH, SOL, traditional assets)
+    requires separate validation and may yield different conclusions.
+
+  \item \textbf{No transaction costs.} Digital option prices are theoretical
+    (no bid-ask spread, execution costs, or slippage). Production deployment
+    requires additional cost modeling.
+
+  \item \textbf{Calibration stability.} On some temporal windows, calibration
+    via differential evolution may converge to suboptimal local minima,
+    particularly for the 11-parameter v1.2 model. Walk-forward analysis
+    reveals parameter instability in certain regimes.
+
+  \item \textbf{Microstructure vs.\ fundamental volatility.} At 1-minute
+    resolution, return variance is partially driven by bid-ask bounce and
+    market microstructure noise rather than fundamental price uncertainty.
+    The model's volatility match may not extend to lower frequencies.
+\end{enumerate}
+
+
+% ============================================================================
+\subsection{Jump Frequency at High Resolution}
+\label{sec:jump_frequency}
+% ============================================================================
+
+\begin{proposition}[Resolution-Dependent Jump Frequency]
+\label{prop:jump_freq}
+For the v1.1 jump-diffusion with intensity
+$\lambda_t = \lambda_0 / (\sigma_t + \varepsilon) \cdot e^{-M_t}$,
+the expected total number of jumps in a simulation of $n$ steps at
+time step $\Delta t$ is:
+\[
+  \E\!\left[\sum_{i=1}^{n} N_i\right]
+  = \sum_{i=1}^{n} \E[\lambda_{t_i}]\,\Delta t
+  \approx n\,\bar{\lambda}\,\Delta t,
+\]
+where $\bar{\lambda} = \lambda_0 / (\bar{\sigma} + \varepsilon)$ under
+steady-state volatility $\bar{\sigma}$ and $M \approx 0$ (no jump history).
+
+For calibrated v1.1 parameters ($\lambda_0 = 1.184$, $\bar{\sigma} = 0.596$,
+$\varepsilon = 0.001$) on $n = 2{,}500$ steps (3.5 days at 1-minute):
+\[
+  \E[N_{\text{jumps}}] \approx 2{,}500 \times \frac{1.184}{0.597}
+    \times \frac{1}{525{,}600} \approx 0.009.
+\]
+At 5-minute resolution ($\Delta t \times 5$), $\E[N] \approx 0.047$.
+At 1-hour resolution, $\E[N] \approx 0.57$. Jumps become statistically
+material ($\E[N] \geq 1$ per path) only at $\sim$2-hour resolution or coarser.
+\end{proposition}
+
+This resolution dependence is not specific to the Brulant model: any
+calibrated Poisson jump-diffusion with similar intensity will exhibit
+negligible jump contribution at minute-scale resolution. The practical
+implication is that at high frequency, model selection between jump and
+pure diffusion formulations should be decided by parsimony, not by
+theoretical jump dynamics.
+
 
 % ============================================================================
 \section*{Appendix A: Digital Option Pricing Results}

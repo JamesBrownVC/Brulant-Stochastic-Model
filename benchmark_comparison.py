@@ -103,7 +103,7 @@ def simulate_heston(n_steps, dt, num_paths, S0, v0, kappa, theta, xi, rho_h,
 
 
 def calibrate_heston(train_r, dt):
-    """Calibrate Heston via simple moment matching."""
+    """Calibrate Heston via moment matching (equalized DE budget)."""
     emp_var = np.var(train_r)
     emp_kurt = float(stats.kurtosis(train_r))
     ann_var = emp_var / dt
@@ -132,9 +132,10 @@ def calibrate_heston(train_r, dt):
             return 1e6
 
     from scipy.optimize import differential_evolution
+    # 4 params x popsize=25 x maxiter=15 = 1500 evals (comparable to Brulant's ~1540)
     bounds = [(0.5, 30.0), (0.01, 2.0), (0.05, 3.0), (-0.95, 0.3)]
-    res = differential_evolution(obj, bounds, maxiter=8, seed=42, popsize=6,
-                                  polish=False, tol=0.01)
+    res = differential_evolution(obj, bounds, maxiter=15, seed=42, popsize=25,
+                                  polish=True, tol=0.01)
     k, th, x_, r_ = res.x
     return {"v0": float(v0), "kappa": max(0.1, float(k)),
             "theta": max(0.01, float(th)), "xi": max(0.01, float(x_)),
@@ -175,7 +176,7 @@ def simulate_merton(n_steps, dt, num_paths, S0, sigma, lam, jump_mu, jump_sigma,
 
 
 def calibrate_merton(train_r, dt):
-    """Calibrate Merton via moment matching."""
+    """Calibrate Merton via moment matching (equalized DE budget)."""
     emp_std = np.std(train_r)
     emp_kurt = float(stats.kurtosis(train_r))
     ann_sigma = emp_std / np.sqrt(dt) * 0.8  # diffusion carries ~80% of variance
@@ -192,9 +193,10 @@ def calibrate_merton(train_r, dt):
             return 1e6
 
     from scipy.optimize import differential_evolution
+    # 3 params x popsize=34 x maxiter=15 = 1530 evals (comparable to Brulant's ~1540)
     bounds = [(0.1, 20.0), (-0.05, 0.05), (0.01, 0.3)]
-    res = differential_evolution(obj, bounds, maxiter=8, seed=42, popsize=6,
-                                  polish=False, tol=0.01)
+    res = differential_evolution(obj, bounds, maxiter=15, seed=42, popsize=34,
+                                  polish=True, tol=0.01)
     lam, jmu, jsig = res.x
     return {"sigma": float(ann_sigma), "lam": float(lam),
             "jump_mu": float(jmu), "jump_sigma": float(jsig)}
@@ -236,7 +238,7 @@ def simulate_sabr(n_steps, dt, num_paths, S0, alpha_s, beta_s, rho_s, nu_s,
 
 
 def calibrate_sabr(train_r, dt, S0=1.0):
-    """Calibrate SABR via moment matching."""
+    """Calibrate SABR via moment matching (equalized DE budget)."""
     emp_std = np.std(train_r)
     emp_kurt = float(stats.kurtosis(train_r))
 
@@ -252,9 +254,10 @@ def calibrate_sabr(train_r, dt, S0=1.0):
             return 1e6
 
     from scipy.optimize import differential_evolution
+    # 4 params x popsize=25 x maxiter=15 = 1500 evals (comparable to Brulant's ~1540)
     bounds = [(0.001, 5.0), (0.1, 1.0), (-0.95, 0.95), (0.01, 5.0)]
-    res = differential_evolution(obj, bounds, maxiter=8, seed=42, popsize=6,
-                                  polish=False, tol=0.01)
+    res = differential_evolution(obj, bounds, maxiter=15, seed=42, popsize=25,
+                                  polish=True, tol=0.01)
     al, be, rh, nu = res.x
     return {"alpha_s": float(al), "beta_s": float(be),
             "rho_s": max(-0.99, min(float(rh), 0.99)), "nu_s": float(nu)}
@@ -298,11 +301,16 @@ def main():
     print("\nFetching 5000 1-min candles...")
     returns_raw = fetch_binance_log_returns("BTCUSDT", "1m", 5000)
     dt = interval_to_dt_years("1m")
-    mu = np.median(returns_raw)
-    mad = np.percentile(np.abs(returns_raw - mu), 75) * 1.4826
-    returns = np.clip(returns_raw, mu - 5*mad, mu + 5*mad)
-    train_r = returns[:int(len(returns)*0.75)]
-    test_r = returns[int(len(returns)*0.75):]
+
+    # Split BEFORE winsorization; thresholds from train only (no test leakage)
+    n_split = int(len(returns_raw) * 0.75)
+    train_r_raw = returns_raw[:n_split]
+    test_r_raw = returns_raw[n_split:]
+    mu = np.median(train_r_raw)
+    mad = np.percentile(np.abs(train_r_raw - mu), 75) * 1.4826
+    train_r = np.clip(train_r_raw, mu - 5 * mad, mu + 5 * mad)
+    test_r = np.clip(test_r_raw, mu - 5 * mad, mu + 5 * mad)
+    print(f"  Winsorization: train-derived thresholds [{mu - 5*mad:.8f}, {mu + 5*mad:.8f}]")
 
     try:
         import requests

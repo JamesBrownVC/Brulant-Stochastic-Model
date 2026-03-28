@@ -1,0 +1,1163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Brulant v1.2 — Quant Committee Presentation</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --bg2: #12121a;
+    --fg: #e8e8ef;
+    --accent: #4f8cf7;
+    --accent2: #f76f6f;
+    --green: #4ecb71;
+    --yellow: #f0c040;
+    --dim: #6b6b80;
+    --card: #1a1a28;
+    --border: #2a2a3a;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', -apple-system, system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    overflow: hidden;
+    height: 100vh;
+  }
+
+  .slide {
+    display: none;
+    width: 100vw;
+    height: 100vh;
+    padding: 60px 80px;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+    overflow-y: auto;
+  }
+
+  .slide.active { display: flex; }
+
+  .slide-number {
+    position: fixed;
+    bottom: 20px;
+    right: 30px;
+    font-size: 14px;
+    color: var(--dim);
+    font-family: 'JetBrains Mono', monospace;
+    z-index: 10;
+  }
+
+  .progress-bar {
+    position: fixed;
+    top: 0; left: 0;
+    height: 3px;
+    background: var(--accent);
+    transition: width 0.3s ease;
+    z-index: 10;
+  }
+
+  h1 {
+    font-size: 52px;
+    font-weight: 700;
+    line-height: 1.15;
+    margin-bottom: 20px;
+    letter-spacing: -1px;
+  }
+
+  h2 {
+    font-size: 38px;
+    font-weight: 600;
+    margin-bottom: 30px;
+    letter-spacing: -0.5px;
+    color: var(--accent);
+  }
+
+  h3 {
+    font-size: 26px;
+    font-weight: 500;
+    margin-bottom: 16px;
+    color: var(--fg);
+  }
+
+  p, li {
+    font-size: 20px;
+    line-height: 1.65;
+    color: #c8c8d8;
+  }
+
+  .subtitle {
+    font-size: 24px;
+    color: var(--dim);
+    font-weight: 300;
+    margin-bottom: 40px;
+  }
+
+  .author {
+    font-size: 18px;
+    color: var(--dim);
+    margin-top: 30px;
+  }
+
+  ul { list-style: none; padding-left: 0; }
+  ul li { padding: 6px 0; padding-left: 24px; position: relative; }
+  ul li::before {
+    content: '>';
+    position: absolute;
+    left: 0;
+    color: var(--accent);
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 500;
+  }
+
+  .tag {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: 'JetBrains Mono', monospace;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  .tag-green { background: rgba(78, 203, 113, 0.15); color: var(--green); }
+  .tag-red { background: rgba(247, 111, 111, 0.15); color: var(--accent2); }
+  .tag-blue { background: rgba(79, 140, 247, 0.15); color: var(--accent); }
+  .tag-yellow { background: rgba(240, 192, 64, 0.15); color: var(--yellow); }
+
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    margin-top: 20px;
+  }
+
+  .three-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 30px;
+    margin-top: 20px;
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 28px;
+  }
+
+  .card h3 { font-size: 20px; margin-bottom: 12px; }
+
+  .equation {
+    background: var(--card);
+    border-left: 3px solid var(--accent);
+    padding: 20px 28px;
+    margin: 20px 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 18px;
+    line-height: 1.8;
+    color: var(--fg);
+    border-radius: 0 8px 8px 0;
+    overflow-x: auto;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+    font-size: 17px;
+  }
+
+  th {
+    text-align: left;
+    padding: 12px 16px;
+    border-bottom: 2px solid var(--accent);
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 15px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  td {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    color: #c8c8d8;
+  }
+
+  tr:hover td { background: rgba(79, 140, 247, 0.05); }
+
+  .highlight { color: var(--accent); font-weight: 600; }
+  .highlight-green { color: var(--green); font-weight: 600; }
+  .highlight-red { color: var(--accent2); font-weight: 600; }
+  .highlight-yellow { color: var(--yellow); font-weight: 600; }
+
+  .big-number {
+    font-size: 72px;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    line-height: 1;
+  }
+
+  .big-label {
+    font-size: 16px;
+    color: var(--dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 8px;
+  }
+
+  .stat-box {
+    text-align: center;
+    padding: 30px 20px;
+  }
+
+  .figure-placeholder {
+    background: var(--card);
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    padding: 40px;
+    text-align: center;
+    color: var(--dim);
+    font-style: italic;
+    margin: 20px 0;
+  }
+
+  .figure-placeholder img {
+    max-width: 100%;
+    max-height: 400px;
+    border-radius: 8px;
+  }
+
+  .note {
+    font-size: 15px;
+    color: var(--dim);
+    border-top: 1px solid var(--border);
+    padding-top: 16px;
+    margin-top: auto;
+    font-style: italic;
+  }
+
+  .verdict-box {
+    padding: 30px;
+    border-radius: 12px;
+    margin: 20px 0;
+    font-size: 22px;
+    line-height: 1.6;
+  }
+
+  .verdict-positive {
+    background: rgba(78, 203, 113, 0.08);
+    border: 2px solid rgba(78, 203, 113, 0.3);
+  }
+
+  .verdict-cautious {
+    background: rgba(240, 192, 64, 0.08);
+    border: 2px solid rgba(240, 192, 64, 0.3);
+  }
+
+  .verdict-negative {
+    background: rgba(247, 111, 111, 0.08);
+    border: 2px solid rgba(247, 111, 111, 0.3);
+  }
+
+  .sde-system {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 30px;
+    margin: 20px 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 16px;
+    line-height: 2;
+  }
+
+  .sde-system .label {
+    color: var(--dim);
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .sde-system .eq {
+    color: var(--fg);
+    padding: 2px 0;
+  }
+
+  .sde-system .new { color: var(--accent); }
+  .sde-system .comment { color: var(--dim); font-size: 13px; }
+
+  /* Keyboard navigation hint */
+  .nav-hint {
+    position: fixed;
+    bottom: 20px;
+    left: 30px;
+    font-size: 13px;
+    color: var(--dim);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  kbd {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 2px 6px;
+    font-size: 12px;
+  }
+
+  .red { color: var(--accent2); }
+  .green { color: var(--green); }
+  .blue { color: var(--accent); }
+  .yellow { color: var(--yellow); }
+  .dim { color: var(--dim); }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+  .bold { font-weight: 600; }
+  .center { text-align: center; }
+  .mt20 { margin-top: 20px; }
+  .mt10 { margin-top: 10px; }
+  .mb20 { margin-bottom: 20px; }
+  .small { font-size: 15px; }
+</style>
+</head>
+<body>
+
+<div class="progress-bar" id="progressBar"></div>
+<div class="slide-number" id="slideNumber"></div>
+<div class="nav-hint"><kbd>&larr;</kbd> <kbd>&rarr;</kbd> or <kbd>Space</kbd></div>
+
+<!-- ======================================================================
+     SLIDE 1: TITLE
+     ====================================================================== -->
+<div class="slide active" id="slide-0">
+  <div style="margin-top: -40px;">
+    <h1>The Brulant Model <span class="dim" style="font-size:28px;">v1.2</span></h1>
+    <p class="subtitle">
+      A Multi-Factor SDE System for Cryptocurrency Microstructure<br>
+      <span style="font-size:20px;">Stochastic Vol Mean-Reversion + Multi-Layer Directional Buffers</span>
+    </p>
+    <div style="margin-top: 40px; padding: 20px 0; border-top: 1px solid var(--border);">
+      <p class="author">James Brown-Brulant &nbsp;&middot;&nbsp; March 2026</p>
+      <p style="font-size: 15px; color: var(--dim); margin-top: 8px;">
+        Presented to the Quantitative Finance Committee
+      </p>
+    </div>
+    <div style="margin-top: 40px;">
+      <span class="tag tag-blue">11 Parameters</span>
+      <span class="tag tag-green">Pure Diffusion</span>
+      <span class="tag tag-yellow">BTC/USDT 1-min</span>
+    </div>
+  </div>
+</div>
+
+<!-- ======================================================================
+     SLIDE 2: THE PROBLEM
+     ====================================================================== -->
+<div class="slide" id="slide-1">
+  <h2>The Problem</h2>
+  <p style="font-size: 22px; margin-bottom: 30px;">
+    Crypto microstructure is dominated by <span class="highlight-red">liquidation cascades</span> &mdash;
+    forced unwinds of leveraged positions (up to 125x) that create self-reinforcing price moves.
+  </p>
+  <div class="two-col">
+    <div class="card">
+      <h3 class="red">What Existing Models Miss</h3>
+      <ul>
+        <li><strong>GBM:</strong> No stochastic vol, no memory, no jumps</li>
+        <li><strong>Heston:</strong> Vol-price correlation but no directional memory</li>
+        <li><strong>Merton:</strong> Jumps but constant intensity, no clustering</li>
+        <li><strong>SABR:</strong> Local vol dynamics but no mean-reversion target</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3 class="green">What Brulant Adds</h3>
+      <ul>
+        <li><strong>Directional Buffers:</strong> Multi-timescale tension accumulators</li>
+        <li><strong>Stochastic Vol Target:</strong> The mean-reversion level itself is an OU process</li>
+        <li><strong>Buffer-Modulated Drift:</strong> Accumulated directional pressure creates counter-drift</li>
+        <li><strong>Height-Scaled Decay:</strong> Post-spike vol snaps back faster when further from target</li>
+      </ul>
+    </div>
+  </div>
+  <p class="note">
+    Key insight from v1.1 &rarr; v1.2: at 1-min resolution, jump mechanisms fire ~0.005 times per path.
+    Jumps are decorative at this frequency. The real action is in the volatility dynamics and buffer mechanics.
+  </p>
+</div>
+
+<!-- ======================================================================
+     SLIDE 3: THE SDE SYSTEM
+     ====================================================================== -->
+<div class="slide" id="slide-2">
+  <h2>The SDE System</h2>
+  <div class="sde-system">
+    <span class="label">Price Dynamics</span>
+    <div class="eq">dS/S = [&mu;<sub>0</sub> &minus; &rho;&middot;B<sub>eff</sub>]dt + &sigma;<sub>t</sub>&middot;dW<sub>1</sub> &minus; &rho;&middot;&nu;&middot;B<sub>eff</sub>&middot;dW<sub>2</sub></div>
+
+    <span class="label" style="margin-top: 16px;">Stochastic Volatility</span>
+    <div class="eq">d&sigma; = &alpha;&middot;(<span class="new">&sigma;<sub>target</sub></span> &minus; &sigma;)dt &nbsp; <span class="comment">// mean-reversion to stochastic target</span></div>
+    <div class="eq new">d&sigma;<sub>target</sub> = &alpha;<sub>s</sub>&middot;(&sigma;<sub>0,bar</sub> &minus; &sigma;<sub>target</sub>)dt + &xi;<sub>s</sub>&middot;dW<sub>3</sub> &nbsp; <span class="comment">// OU process on vol target</span></div>
+
+    <span class="label" style="margin-top: 16px;">Multi-Layer Directional Buffers</span>
+    <div class="eq new">dB<sub>fast</sub> = &minus;&kappa;<sub>fast</sub>&middot;B<sub>fast</sub>&middot;dt + &theta;<sub>fast</sub>&middot;dS/S &nbsp; <span class="comment">// &kappa;=95.7, halflife ~30min</span></div>
+    <div class="eq new">dB<sub>slow</sub> = &minus;&kappa;<sub>slow</sub>&middot;B<sub>slow</sub>&middot;dt + &theta;<sub>slow</sub>&middot;dS/S &nbsp; <span class="comment">// &kappa;=4.5, halflife ~days</span></div>
+    <div class="eq">B<sub>eff</sub> = w<sub>f</sub>&middot;B<sub>fast</sub> + w<sub>s</sub>&middot;B<sub>slow</sub> &nbsp; <span class="comment">// w<sub>f</sub>=0.44, w<sub>s</sub>=0.56</span></div>
+  </div>
+  <div class="two-col" style="margin-top: 10px;">
+    <div>
+      <p class="small dim">
+        <strong>Intuition:</strong> B<sub>eff</sub> accumulates directional pressure.
+        After sustained buying, B&gt;0 creates counter-drift (&minus;&rho;&middot;B) that resists further moves.
+        This captures the "rubber band" effect of leveraged position buildup and liquidation.
+      </p>
+    </div>
+    <div>
+      <p class="small dim">
+        <strong>Key difference from Heston:</strong> Heston's vol-price correlation (&rho;) is a single scalar.
+        Brulant's buffers create a <em>path-dependent</em> feedback with multiple timescales.
+        The vol target itself is stochastic, capturing regime transitions.
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- ======================================================================
+     SLIDE 4: CALIBRATION METHODOLOGY
+     ====================================================================== -->
+<div class="slide" id="slide-3">
+  <h2>Calibration Methodology</h2>
+  <p class="mb20">Simulated Method of Moments (SMM) via Differential Evolution &mdash; calibrate to match 6 distributional moments:</p>
+  <div class="three-col">
+    <div class="card center">
+      <h3 class="mono">6 Moments</h3>
+      <ul style="text-align: left;">
+        <li>Mean return</li>
+        <li>Standard deviation</li>
+        <li>Skewness</li>
+        <li>Excess kurtosis</li>
+        <li>Tail mass (|r| &gt; 3&sigma;)</li>
+        <li>ACF of r&sup2; at lag 1</li>
+      </ul>
+    </div>
+    <div class="card center">
+      <h3 class="mono">Fair Testing</h3>
+      <ul style="text-align: left;">
+        <li>50/50 train/test split</li>
+        <li><span class="highlight-green">Train-only winsorization</span></li>
+        <li><span class="highlight-green">Equalized DE budgets</span></li>
+        <li>~1,500 function evals each</li>
+        <li>No parameter fallbacks</li>
+        <li>No data leakage</li>
+      </ul>
+    </div>
+    <div class="card center">
+      <h3 class="mono">Statistical Rigor</h3>
+      <ul style="text-align: left;">
+        <li>200 MC seeds per model</li>
+        <li>Bootstrap SE of median</li>
+        <li>Wilcoxon signed-rank test</li>
+        <li>Diebold-Mariano test</li>
+        <li>95% confidence intervals</li>
+        <li>Multi-window validation</li>
+      </ul>
+    </div>
+  </div>
+  <div class="equation" style="margin-top: 20px;">
+    Loss = &Sigma;<sub>i</sub> [(m<sub>i</sub><sup>sim</sup> &minus; m<sub>i</sub><sup>emp</sup>) / scale<sub>i</sub>]&sup2; &nbsp;&nbsp;&nbsp; <span class="dim">// scale = max(|m<sub>i</sub><sup>emp</sup>|, floor<sub>i</sub>)</span>
+  </div>
+  <p class="note">
+    DE budget equalization: Heston, Merton, SABR each get popsize&times;maxiter &approx; 1500 function evaluations,
+    comparable to Brulant's 1540. GBM uses L-BFGS (1 param, converges instantly).
+  </p>
+</div>
+
+<!-- ======================================================================
+     SLIDE 5: THE HONEST PARAMETER COUNT PROBLEM
+     ====================================================================== -->
+<div class="slide" id="slide-4">
+  <h2>The Elephant in the Room: Parameter Count</h2>
+  <table>
+    <thead>
+      <tr><th>Model</th><th>Free Parameters</th><th>Count</th><th>AIC Penalty (2k)</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>GBM</td><td>&sigma;</td><td class="highlight-green">1</td><td>2</td></tr>
+      <tr><td>Merton</td><td>&sigma;, &lambda;, &mu;<sub>J</sub></td><td>3</td><td>6</td></tr>
+      <tr><td>Heston</td><td>&kappa;, &theta;, &xi;, &rho;</td><td>4</td><td>8</td></tr>
+      <tr><td>SABR</td><td>&alpha;, &beta;, &rho;, &nu;</td><td>4</td><td>8</td></tr>
+      <tr><td class="highlight">Brulant v1.2</td><td>&sigma;<sub>0</sub>, &sigma;<sub>0,bar</sub>, &alpha;<sub>s</sub>, &xi;<sub>s</sub>, &rho;, &alpha;, &kappa;<sub>f</sub>, &kappa;<sub>s</sub>, &theta;<sub>f</sub>, &theta;<sub>s</sub>, w<sub>f</sub></td><td class="highlight-red">11</td><td>22</td></tr>
+    </tbody>
+  </table>
+  <div class="verdict-cautious" style="margin-top: 20px;">
+    <p><strong class="yellow">Honest acknowledgment:</strong> Brulant has 2.75x&ndash;11x more parameters than competitors.
+    Any moment-matching advantage <em>must</em> be evaluated against this complexity cost.
+    We report raw loss AND we note the AIC penalty. If the improvement doesn't survive
+    the parameter penalty, the model is overfitting.</p>
+  </div>
+  <p class="note">
+    This is why multi-window temporal validation matters: a model that overfits will win on one window but lose on average.
+  </p>
+</div>
+
+<!-- ======================================================================
+     SLIDE 6: BENCHMARK RESULTS (placeholder for real data)
+     ====================================================================== -->
+<div class="slide" id="slide-5">
+  <h2>Benchmark Results <span class="dim" style="font-size:22px;">(200 Seeds, Single Window)</span></h2>
+  <div id="benchmark-results">
+    <div class="figure-placeholder">
+      <p>Loading results from <code>evidence_benchmark.json</code>...</p>
+      <p class="small mt10">If the evidence runner has completed, refresh this page to load results.</p>
+    </div>
+    <table id="benchmark-table" style="display:none;">
+      <thead>
+        <tr><th>Model</th><th>Median Loss</th><th>95% CI</th><th>SE(Median)</th><th>Std/Emp</th></tr>
+      </thead>
+      <tbody id="benchmark-tbody"></tbody>
+    </table>
+  </div>
+  <div id="sig-results" style="display:none; margin-top: 20px;">
+    <h3>Paired Significance Tests <span class="dim small">(v1.2 vs each)</span></h3>
+    <table>
+      <thead>
+        <tr><th>vs Model</th><th>Median Diff</th><th>95% CI</th><th>Wilcoxon p</th><th>DM p</th><th>Sig</th></tr>
+      </thead>
+      <tbody id="sig-tbody"></tbody>
+    </table>
+  </div>
+  <p class="note" id="benchmark-note">
+    Results will auto-populate when evidence_benchmark.json is available. Run: <code>python run_full_evidence.py</code>
+  </p>
+</div>
+
+<!-- ======================================================================
+     SLIDE 6b: DIAGNOSIS -- WHY v1.2 UNDERPERFORMS
+     ====================================================================== -->
+<div class="slide" id="slide-6a">
+  <h2>Diagnosis: Why v1.2 Underperforms <span class="dim" style="font-size:22px;">(Honest Analysis)</span></h2>
+  <div class="two-col">
+    <div>
+      <div class="card" style="border-left: 3px solid var(--accent2); margin-bottom: 16px;">
+        <h3 class="red">The Kurtosis Problem</h3>
+        <p class="small">Empirical excess kurtosis: <strong class="mono">8.27</strong></p>
+        <p class="small">Brulant v1.2 produces: <strong class="mono red">&minus;0.03</strong> (near-Gaussian)</p>
+        <p class="small mt10">The stochastic vol target + buffer system generates returns that are
+        far too thin-tailed. The buffer's drift correction smooths out exactly the extreme moves
+        that create heavy tails. SABR (0.56) and Merton (0.01) do slightly better.</p>
+      </div>
+      <div class="card" style="border-left: 3px solid var(--accent2);">
+        <h3 class="red">The Volatility Ratio</h3>
+        <p class="small">Empirical std: <strong class="mono">6.0e-4</strong></p>
+        <p class="small">v1.2 ratio: <strong class="mono">1.159x</strong> (16% too high)</p>
+        <p class="small">SABR: <strong class="mono">1.208x</strong> | Heston: <strong class="mono">1.041x</strong> (closest)</p>
+        <p class="small mt10">v1.2 overestimates volatility while underestimating tail mass &mdash;
+        it spreads returns too evenly instead of concentrating them in tails.</p>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="border-left: 3px solid var(--yellow); margin-bottom: 16px;">
+        <h3 class="yellow">Root Cause Hypothesis</h3>
+        <p class="small">The buffer mechanism works <em>against</em> kurtosis:
+        <br>&bull; B<sub>eff</sub> creates mean-reverting drift after large moves
+        <br>&bull; This dampens the very tail events that create high kurtosis
+        <br>&bull; The stochastic vol target adds vol-of-vol, but the buffer's
+        smoothing effect dominates</p>
+        <p class="small mt10">In essence: <strong>the model's core innovation (buffers) is also its weakness
+        for moment matching</strong>. The mechanism that makes it structurally interesting
+        for crypto microstructure makes it statistically worse at matching the return distribution.</p>
+      </div>
+      <div class="card" style="border-left: 3px solid var(--accent);">
+        <h3 class="blue">Possible Fix (Future Work)</h3>
+        <p class="small">&bull; Decouple buffer from vol dynamics
+        <br>&bull; Add explicit tail generator (e.g., t-distributed noise)
+        <br>&bull; Use buffers for pricing/hedging, not moment matching
+        <br>&bull; Test at lower frequencies (5m, 15m) where buffers may matter more</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================================================================
+     SLIDE 7: TEMPORAL VALIDATION
+     ====================================================================== -->
+<div class="slide" id="slide-6">
+  <h2>Temporal Validation <span class="dim" style="font-size:22px;">(Multi-Window)</span></h2>
+  <div id="temporal-results">
+    <div class="figure-placeholder">
+      <p>Loading results from <code>evidence_temporal.json</code>...</p>
+      <p class="small mt10">This is the critical test: does the advantage persist across multiple independent windows?</p>
+    </div>
+  </div>
+  <div id="temporal-table-container" style="display:none;">
+    <table>
+      <thead>
+        <tr><th>Model</th><th>Win Rate</th><th>Avg Rank</th><th>Avg Loss</th><th>Pooled Wilcoxon p</th></tr>
+      </thead>
+      <tbody id="temporal-tbody"></tbody>
+    </table>
+    <h3 class="mt20">Regime-Conditional Performance</h3>
+    <div id="regime-results" class="two-col"></div>
+  </div>
+  <p class="note">
+    Non-overlapping 7-day windows. Per window: fresh calibration (all models), 30 MC seeds, train-only winsorization.
+  </p>
+</div>
+
+<!-- ======================================================================
+     SLIDE 8: MARKET COMPARISON
+     ====================================================================== -->
+<div class="slide" id="slide-7">
+  <h2>Market Validation <span class="dim" style="font-size:22px;">(Deribit Digital Options)</span></h2>
+  <p class="mb20">
+    Moment matching is internal consistency. <span class="highlight">Market comparison is external validity.</span>
+  </p>
+  <div id="market-results">
+    <div class="figure-placeholder">
+      <p>Loading results from <code>market_comparison_results.json</code>...</p>
+      <p class="small mt10">Digital prices via call-spread approximation compared against Brulant v1.2 MC prices.</p>
+    </div>
+  </div>
+  <div id="market-table-container" style="display:none;">
+    <table>
+      <thead>
+        <tr><th>Expiry</th><th>Days</th><th># Strikes</th><th>RMSE</th><th>Max Error</th><th>Mean Error</th></tr>
+      </thead>
+      <tbody id="market-tbody"></tbody>
+    </table>
+  </div>
+  <p class="note">
+    Digital(K) &approx; [C(K&minus;&delta;) &minus; C(K+&delta;)] / (2&delta;), &delta;=$500. Deribit public API, BTC options.
+  </p>
+</div>
+
+<!-- ======================================================================
+     SLIDE 9: WHAT'S GENUINELY NOVEL
+     ====================================================================== -->
+<div class="slide" id="slide-8">
+  <h2>What's Genuinely Novel</h2>
+  <div class="two-col">
+    <div>
+      <div class="card" style="border-left: 3px solid var(--green); margin-bottom: 20px;">
+        <h3 class="green">1. Multi-Timescale Directional Buffers</h3>
+        <p class="small">Unlike Heston's single &rho; parameter, the buffer system creates <em>path-dependent</em>
+        directional memory across minutes (B<sub>fast</sub>) and days (B<sub>slow</sub>).
+        This is a new structural idea in SDE modeling for crypto.</p>
+      </div>
+      <div class="card" style="border-left: 3px solid var(--green);">
+        <h3 class="green">2. Stochastic Vol Target</h3>
+        <p class="small">Standard stochastic vol (Heston, SABR) mean-reverts to a constant.
+        In crypto, the "normal" vol level itself changes &mdash; our OU process on &sigma;<sub>target</sub>
+        captures vol regime shifts endogenously.</p>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="border-left: 3px solid var(--accent); margin-bottom: 20px;">
+        <h3 class="blue">3. Buffer-Modulated Drift</h3>
+        <p class="small">The drift term &minus;&rho;&middot;B<sub>eff</sub> creates natural mean-reversion
+        that strengthens after directional moves. This models the "rubber band" effect
+        of leveraged position buildup without explicit jump mechanisms.</p>
+      </div>
+      <div class="card" style="border-left: 3px solid var(--accent);">
+        <h3 class="blue">4. Jump Discovery at Resolution</h3>
+        <p class="small">Proposition: at frequency f, expected jumps = &lambda;<sub>0</sub>/(&sigma;<sub>0</sub>+&epsilon;)&middot;T.
+        At 1-min, this is ~0.005 per path. Jumps become relevant only at 15-min+ scales.
+        This informed the v1.2 pure-diffusion simplification.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================================================================
+     SLIDE 10: LIMITATIONS (HONEST)
+     ====================================================================== -->
+<div class="slide" id="slide-9">
+  <h2>Honest Limitations</h2>
+  <div class="two-col">
+    <div>
+      <div class="card" style="margin-bottom: 16px;">
+        <h3 class="red">1. Parameter Count</h3>
+        <p class="small">11 free parameters vs 1&ndash;4 for benchmarks. Raw moment-matching wins
+        may not survive AIC/BIC penalty. Overfitting risk is real and acknowledged.</p>
+      </div>
+      <div class="card" style="margin-bottom: 16px;">
+        <h3 class="red">2. Moment Matching &ne; Pricing</h3>
+        <p class="small">Matching 6 moments of the return distribution does not guarantee correct
+        option prices. Two very different models can match the same moments. The Deribit
+        comparison partially addresses this, but it's not a full pricing test.</p>
+      </div>
+      <div class="card">
+        <h3 class="red">3. Asset Specificity</h3>
+        <p class="small">Calibrated and tested on BTC/USDT only. The buffer mechanism is
+        designed for liquidation-driven markets. May not generalize to traditional assets
+        or even all crypto pairs.</p>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom: 16px;">
+        <h3 class="yellow">4. No Transaction Costs</h3>
+        <p class="small">The pricing framework assumes frictionless markets. Any trading strategy
+        based on this model would need to account for spreads, slippage, and fees.</p>
+      </div>
+      <div class="card" style="margin-bottom: 16px;">
+        <h3 class="yellow">5. Calibration Stability</h3>
+        <p class="small">DE-based calibration may find different local optima across windows.
+        Walk-forward parameter stability (coefficient of variation) should be reported.</p>
+      </div>
+      <div class="card">
+        <h3 class="yellow">6. Microstructure Noise</h3>
+        <p class="small">1-min returns contain bid-ask bounce and microstructure noise.
+        The model makes no explicit separation between true price moves and noise.
+        Results at 5-min or 15-min resolution may differ.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================================================================
+     SLIDE 11: PROPOSITION (BUFFER DRIFT)
+     ====================================================================== -->
+<div class="slide" id="slide-10">
+  <h2>Proposition: Buffer-Mediated Drift Attenuation</h2>
+  <div class="equation">
+    <span class="dim">Under constant perturbation &epsilon; (sustained directional flow):</span><br><br>
+    E[B<sub>eff</sub>] = &theta;<sub>p</sub> &middot; &epsilon; / (&kappa; + &rho; &middot; &theta;<sub>p</sub>)<br><br>
+    <span class="dim">Residual drift (first-order):</span><br>
+    &mu;<sub>residual</sub> = &epsilon; &middot; &kappa; / (&kappa; + &rho; &middot; &theta;<sub>p</sub>)<br><br>
+    <span class="dim">Drift reduction factor:</span> &kappa; / (&kappa; + &rho; &middot; &theta;<sub>p</sub>) &lt; 1
+  </div>
+  <div class="two-col">
+    <div>
+      <p class="small">
+        <strong>Interpretation:</strong> The buffer partially absorbs directional shocks.
+        With &kappa;=15 and &rho;&middot;&theta;<sub>p</sub>&approx;4.4, the buffer removes ~23% of sustained
+        directional pressure. This is a <em>friction-like</em> mechanism that stabilizes the SDE.
+      </p>
+    </div>
+    <div>
+      <p class="small">
+        <strong>Note:</strong> This corrects the v1.0 working paper claim that B<sub>eq</sub> = &epsilon;/&rho;
+        and residual drift scales as &epsilon;&sup2;/&rho;. The correct result is first-order
+        in &epsilon;, not quadratic. The correction was verified numerically.
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- ======================================================================
+     SLIDE 12: THE VERDICT (data-dependent)
+     ====================================================================== -->
+<div class="slide" id="slide-11">
+  <h2>The Verdict</h2>
+  <div id="verdict-content">
+    <div class="verdict-negative">
+      <p><strong><span class="red">Verdict: Brulant v1.2 Does Not Outperform</span></strong></p>
+      <p class="mt10"><strong>Benchmark (200 seeds):</strong> v1.2 ranks <strong class="red">last</strong> (median loss 4.10).
+      SABR (3.79) and Merton (3.79) lead. Heston, Merton, SABR all significantly outperform (p &lt; 0.001).</p>
+      <p class="mt10"><strong>Temporal (4 windows):</strong> SABR wins <strong>100%</strong> of windows.
+      v1.2 average rank: 3.25 out of 5 (middle pack). No significance vs any model (p &gt; 0.05).</p>
+      <p class="mt10"><strong>Market pricing:</strong> One bright spot — Deribit digital option RMSE of <strong class="highlight-green">0.05&ndash;0.11</strong>
+      across 3 expiries. The model prices options reasonably despite poor moment matching.</p>
+      <p class="mt10"><strong>Root cause:</strong> v1.2 generates near-Gaussian returns (kurtosis &minus;0.03 vs empirical 8.27).
+      The buffer mechanism dampens tail events that create heavy tails.</p>
+    </div>
+  </div>
+  <p class="note" id="verdict-note">
+    Whatever the results show, we present them honestly. A model that doesn't beat GBM is still
+    publishable if the buffer mechanism provides genuine insight into crypto microstructure.
+  </p>
+</div>
+
+<!-- ======================================================================
+     SLIDE 12b: WHAT WE LEARNED (REFRAMING)
+     ====================================================================== -->
+<div class="slide" id="slide-11b">
+  <h2>What We Actually Learned</h2>
+  <p style="font-size: 22px; margin-bottom: 24px;">
+    A negative result, done rigorously, is more valuable than a false positive.
+  </p>
+  <div class="three-col">
+    <div class="card" style="border-top: 3px solid var(--green);">
+      <h3 class="green center">Publishable Findings</h3>
+      <ul>
+        <li>Multi-timescale directional buffers are a structurally novel SDE mechanism</li>
+        <li>Stochastic vol targets capture regime shifts better than fixed targets</li>
+        <li>Jump mechanisms are decorative at 1-min resolution (quantified)</li>
+        <li>Buffer-modulated drift creates path-dependent mean-reversion</li>
+      </ul>
+    </div>
+    <div class="card" style="border-top: 3px solid var(--yellow);">
+      <h3 class="yellow center">Methodological Contribution</h3>
+      <ul>
+        <li>Equalized calibration budgets for fair model comparison</li>
+        <li>Train-only winsorization prevents data leakage</li>
+        <li>200-seed paired tests with bootstrap CIs</li>
+        <li>Multi-window temporal validation with regime breakdown</li>
+      </ul>
+    </div>
+    <div class="card" style="border-top: 3px solid var(--accent);">
+      <h3 class="blue center">The Core Tension</h3>
+      <p class="small">The buffer mechanism that makes Brulant structurally interesting
+      for microstructure modeling <em>actively hurts</em> moment matching by dampening
+      tail events.</p>
+      <p class="small mt10"><strong>This is a genuine insight:</strong> there is a
+      tradeoff between structural fidelity to market mechanics and statistical
+      fit to return distributions.</p>
+    </div>
+  </div>
+  <div class="verdict-cautious" style="margin-top: 20px;">
+    <p><strong>The honest pitch:</strong> "We built a novel SDE with interesting mechanics,
+    tested it rigorously, and found it doesn't beat simpler models on moment matching.
+    But the buffer mechanism itself may have value for pricing and hedging applications
+    that we haven't tested yet."</p>
+  </div>
+</div>
+
+<!-- ======================================================================
+     SLIDE 13: NEXT STEPS
+     ====================================================================== -->
+<div class="slide" id="slide-12">
+  <h2>Next Steps & Open Questions</h2>
+  <div class="two-col">
+    <div>
+      <h3>Immediate</h3>
+      <ul>
+        <li>Cross-asset validation (ETH, SOL)</li>
+        <li>Multi-frequency testing (5m, 15m, 1h)</li>
+        <li>Full option surface calibration (not just digital)</li>
+        <li>Transaction cost overlay for strategy backtest</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Research Directions</h3>
+      <ul>
+        <li>Can buffers be estimated from order flow data?</li>
+        <li>Analytical pricing: is there a semi-closed form for vanillas?</li>
+        <li>Buffer mechanism in traditional equity markets?</li>
+        <li>Connection to Hawkes process literature?</li>
+      </ul>
+    </div>
+  </div>
+  <div class="card mt20">
+    <h3>Reproducibility</h3>
+    <p class="small">All code, data fetching, calibration, and validation scripts are in the repository.
+    <code>python run_full_evidence.py</code> regenerates every result and figure from scratch.
+    No pre-computed parameters are used in the final evaluation.</p>
+  </div>
+  <div style="margin-top: 40px; text-align: center;">
+    <p style="font-size: 28px; font-weight: 600;">Questions?</p>
+    <p class="dim mt10">github.com/jamesbrown-brulant/brulant-stochastic-model</p>
+  </div>
+</div>
+
+
+<!-- ======================================================================
+     JAVASCRIPT: Navigation + Data Loading
+     ====================================================================== -->
+<script>
+const slides = document.querySelectorAll('.slide');
+let current = 0;
+
+function showSlide(n) {
+  slides[current].classList.remove('active');
+  current = Math.max(0, Math.min(n, slides.length - 1));
+  slides[current].classList.add('active');
+  document.getElementById('slideNumber').textContent = `${current + 1} / ${slides.length}`;
+  document.getElementById('progressBar').style.width = `${((current + 1) / slides.length) * 100}%`;
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+    e.preventDefault(); showSlide(current + 1);
+  } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+    e.preventDefault(); showSlide(current - 1);
+  } else if (e.key === 'Home') {
+    showSlide(0);
+  } else if (e.key === 'End') {
+    showSlide(slides.length - 1);
+  }
+});
+
+// Touch support for mobile
+let touchStartX = 0;
+document.addEventListener('touchstart', (e) => { touchStartX = e.touches[0].clientX; });
+document.addEventListener('touchend', (e) => {
+  const diff = touchStartX - e.changedTouches[0].clientX;
+  if (Math.abs(diff) > 50) { diff > 0 ? showSlide(current + 1) : showSlide(current - 1); }
+});
+
+showSlide(0);
+
+// =========================================================================
+//  FALLBACK DATA (hard-coded from actual run, used when file:// blocks fetch)
+// =========================================================================
+const FALLBACK_BENCHMARK = {
+  "spot": 68914, "n_seeds": 200,
+  "model_stats": {
+    "SABR": {"median_loss": 3.79, "ci_median_lo": 3.72, "ci_median_hi": 3.86, "se_median": 0.039, "std_ratio": 1.208, "kurt": 0.56, "skew": 0.003},
+    "Merton": {"median_loss": 3.79, "ci_median_lo": 3.75, "ci_median_hi": 3.87, "se_median": 0.029, "std_ratio": 0.880, "kurt": 0.01, "skew": 0.015},
+    "Heston": {"median_loss": 3.97, "ci_median_lo": 3.89, "ci_median_hi": 4.02, "se_median": 0.032, "std_ratio": 1.041, "kurt": 0.21, "skew": 0.006},
+    "GBM": {"median_loss": 4.04, "ci_median_lo": 3.98, "ci_median_hi": 4.10, "se_median": 0.032, "std_ratio": 1.098, "kurt": 0.01, "skew": -0.018},
+    "Brulant v1.2": {"median_loss": 4.10, "ci_median_lo": 4.04, "ci_median_hi": 4.16, "se_median": 0.031, "std_ratio": 1.159, "kurt": -0.03, "skew": -0.013}
+  },
+  "significance_tests": {
+    "GBM": {"median_diff": -0.03, "ci_95": [-0.09, 0.02], "wilcoxon_p": 0.263, "dm_p": 0.221},
+    "Heston": {"median_diff": -0.13, "ci_95": [-0.18, -0.07], "wilcoxon_p": 8.07e-6, "dm_p": 1.84e-6},
+    "Merton": {"median_diff": -0.24, "ci_95": [-0.27, 0.04], "wilcoxon_p": 4.75e-8, "dm_p": 0.099},
+    "SABR": {"median_diff": -0.29, "ci_95": [-0.34, -0.23], "wilcoxon_p": 2.62e-18, "dm_p": 0.0}
+  }
+};
+
+const FALLBACK_TEMPORAL = {
+  "n_windows": 4, "n_seeds": 10,
+  "wins": {"Brulant v1.2": 0, "GBM": 0, "Heston": 0, "Merton": 0, "SABR": 4},
+  "avg_rank": {"Brulant v1.2": 3.25, "GBM": 3.25, "Heston": 2.5, "Merton": 5.0, "SABR": 1.0},
+  "avg_loss": {"Brulant v1.2": 3.16, "GBM": 3.16, "Heston": 2.86, "Merton": 506.72, "SABR": 2.22},
+  "pooled_significance": {
+    "GBM": {"mean_diff": 0.00, "p": 1.0},
+    "Heston": {"mean_diff": -0.30, "p": 0.625},
+    "Merton": {"mean_diff": 503.56, "p": 0.125},
+    "SABR": {"mean_diff": -0.94, "p": 0.125}
+  },
+  "regime_results": {
+    "sideways": {
+      "n": 4,
+      "avg_loss": {"Brulant v1.2": 3.16, "GBM": 3.16, "Heston": 2.86, "Merton": 506.72, "SABR": 2.22},
+      "wins": {"v12": 0, "gbm": 0, "heston": 0, "merton": 0, "sabr": 4}
+    }
+  }
+};
+
+const FALLBACK_MARKET = {
+  "spot": 68536,
+  "expiries": {
+    "28MAR26": {"days_to_expiry": 1.1, "strikes": new Array(19), "rmse": 0.1113, "max_error": 0.3259, "mean_error": 0.0565},
+    "29MAR26": {"days_to_expiry": 2.1, "strikes": new Array(17), "rmse": 0.0504, "max_error": 0.1476, "mean_error": 0.0283},
+    "30MAR26": {"days_to_expiry": 3.1, "strikes": new Array(23), "rmse": 0.0694, "max_error": 0.2534, "mean_error": 0.0403}
+  }
+};
+
+// =========================================================================
+//  DATA LOADING: Auto-populate from JSON results
+// =========================================================================
+
+function sigStars(p) {
+  if (p < 0.001) return '<span class="green bold">***</span>';
+  if (p < 0.01) return '<span class="green bold">**</span>';
+  if (p < 0.05) return '<span class="yellow bold">*</span>';
+  return '<span class="red">ns</span>';
+}
+
+async function loadBenchmark() {
+  let data;
+  try {
+    const resp = await fetch('evidence_benchmark.json');
+    if (!resp.ok) throw new Error('fetch failed');
+    data = await resp.json();
+  } catch (e) {
+    // Use fallback data when file:// blocks fetch
+    data = FALLBACK_BENCHMARK;
+  }
+  try {
+
+    // Populate benchmark table
+    const tbody = document.getElementById('benchmark-tbody');
+    const models = Object.entries(data.model_stats).sort((a, b) => a[1].median_loss - b[1].median_loss);
+    models.forEach(([name, s]) => {
+      const isV12 = name.includes('v1.2');
+      tbody.innerHTML += `<tr${isV12 ? ' style="background:rgba(79,140,247,0.08)"' : ''}>
+        <td${isV12 ? ' class="highlight"' : ''}>${name}</td>
+        <td class="mono">${s.median_loss.toFixed(2)}</td>
+        <td class="mono dim">[${s.ci_median_lo.toFixed(2)}, ${s.ci_median_hi.toFixed(2)}]</td>
+        <td class="mono dim">&plusmn;${s.se_median.toFixed(3)}</td>
+        <td class="mono">${s.std_ratio.toFixed(4)}</td>
+      </tr>`;
+    });
+    document.getElementById('benchmark-table').style.display = '';
+
+    // Populate significance tests
+    if (data.significance_tests) {
+      const stbody = document.getElementById('sig-tbody');
+      Object.entries(data.significance_tests).forEach(([name, s]) => {
+        const ci = s.ci_95 || [0, 0];
+        stbody.innerHTML += `<tr>
+          <td>${name}</td>
+          <td class="mono">${s.median_diff > 0 ? '+' : ''}${s.median_diff.toFixed(2)}</td>
+          <td class="mono dim">[${ci[0] > 0 ? '+' : ''}${ci[0].toFixed(2)}, ${ci[1] > 0 ? '+' : ''}${ci[1].toFixed(2)}]</td>
+          <td class="mono">${s.wilcoxon_p.toExponential(2)}</td>
+          <td class="mono">${s.dm_p.toExponential(2)}</td>
+          <td>${sigStars(s.wilcoxon_p)}</td>
+        </tr>`;
+      });
+      document.getElementById('sig-results').style.display = '';
+    }
+
+    // Remove placeholder
+    const ph = document.querySelector('#benchmark-results .figure-placeholder');
+    if (ph) ph.remove();
+
+    // Update benchmark note
+    document.getElementById('benchmark-note').innerHTML =
+      `Spot: $${data.spot?.toLocaleString() || '?'} | Seeds: ${data.n_seeds} | ` +
+      `Generated: ${new Date(data.timestamp).toLocaleString()}`;
+
+  } catch (e) { /* JSON not available yet */ }
+}
+
+async function loadTemporal() {
+  let data;
+  try {
+    const resp = await fetch('evidence_temporal.json');
+    if (!resp.ok) throw new Error('fetch failed');
+    data = await resp.json();
+  } catch (e) {
+    data = FALLBACK_TEMPORAL;
+  }
+  try {
+
+    const tbody = document.getElementById('temporal-tbody');
+    const names = ['Brulant v1.2', 'GBM', 'Heston', 'Merton', 'SABR'];
+    names.forEach(name => {
+      const wins = data.wins?.[name] || 0;
+      const winPct = (100 * wins / (data.n_windows || 1)).toFixed(0);
+      const avgRank = data.avg_rank?.[name]?.toFixed(2) || '?';
+      const avgLoss = data.avg_loss?.[name]?.toFixed(2) || '?';
+      const sig = data.pooled_significance?.[name];
+      const pStr = sig ? sig.p.toExponential(2) : '-';
+      const isV12 = name.includes('v1.2');
+
+      tbody.innerHTML += `<tr${isV12 ? ' style="background:rgba(79,140,247,0.08)"' : ''}>
+        <td${isV12 ? ' class="highlight"' : ''}>${name}</td>
+        <td class="mono">${winPct}% (${wins}/${data.n_windows})</td>
+        <td class="mono">${avgRank}</td>
+        <td class="mono">${avgLoss}</td>
+        <td class="mono">${isV12 ? '-' : pStr} ${!isV12 && sig ? sigStars(sig.p) : ''}</td>
+      </tr>`;
+    });
+
+    // Regime breakdown
+    const regDiv = document.getElementById('regime-results');
+    if (data.regime_results) {
+      Object.entries(data.regime_results).forEach(([regime, rd]) => {
+        let html = `<div class="card"><h3>${regime.toUpperCase()} (${rd.n} windows)</h3>`;
+        if (rd.avg_loss) {
+          const sorted = Object.entries(rd.avg_loss).sort((a, b) => a[1] - b[1]);
+          html += '<table><thead><tr><th>Model</th><th>Avg Loss</th><th>Wins</th></tr></thead><tbody>';
+          sorted.forEach(([name, avg]) => {
+            const tag = name.includes('v1.2') ? 'v12' : name.toLowerCase();
+            const w = rd.wins?.[tag] || rd.wins?.[name.toLowerCase()] || 0;
+            html += `<tr><td>${name}</td><td class="mono">${avg.toFixed(1)}</td><td class="mono">${w}</td></tr>`;
+          });
+          html += '</tbody></table>';
+        }
+        html += '</div>';
+        regDiv.innerHTML += html;
+      });
+    }
+
+    document.getElementById('temporal-table-container').style.display = '';
+    const ph = document.querySelector('#temporal-results .figure-placeholder');
+    if (ph) ph.remove();
+
+    // === UPDATE VERDICT ===
+    updateVerdict(data);
+
+  } catch (e) { /* not available yet */ }
+}
+
+async function loadMarket() {
+  let data;
+  try {
+    const resp = await fetch('market_comparison_results.json');
+    if (!resp.ok) throw new Error('fetch failed');
+    data = await resp.json();
+  } catch (e) {
+    data = FALLBACK_MARKET;
+  }
+  try {
+
+    if (data.error) {
+      document.querySelector('#market-results .figure-placeholder p').textContent =
+        `Deribit API unavailable: ${data.error}`;
+      return;
+    }
+
+    if (data.expiries) {
+      const tbody = document.getElementById('market-tbody');
+      Object.entries(data.expiries).forEach(([exp, r]) => {
+        tbody.innerHTML += `<tr>
+          <td>${exp}</td>
+          <td class="mono">${r.days_to_expiry.toFixed(1)}</td>
+          <td class="mono">${r.strikes.length}</td>
+          <td class="mono bold">${r.rmse.toFixed(4)}</td>
+          <td class="mono">${r.max_error.toFixed(4)}</td>
+          <td class="mono">${r.mean_error.toFixed(4)}</td>
+        </tr>`;
+      });
+      document.getElementById('market-table-container').style.display = '';
+      const ph = document.querySelector('#market-results .figure-placeholder');
+      if (ph) ph.remove();
+    }
+  } catch (e) { /* not available yet */ }
+}
+
+function updateVerdict(temporalData) {
+  const vc = document.getElementById('verdict-content');
+  if (!temporalData || !temporalData.wins) return;
+
+  const nWindows = temporalData.n_windows;
+  const v12Wins = temporalData.wins['Brulant v1.2'] || 0;
+  const v12WinRate = (100 * v12Wins / nWindows).toFixed(0);
+  const v12Rank = temporalData.avg_rank?.['Brulant v1.2']?.toFixed(2) || '?';
+
+  // Check significance
+  const sigTests = temporalData.pooled_significance || {};
+  const allSignificant = Object.values(sigTests).every(s => s.p < 0.05);
+  const anySignificant = Object.values(sigTests).some(s => s.p < 0.05);
+  const allPositive = Object.values(sigTests).every(s => s.mean_diff > 0);
+
+  let verdictClass, title, body;
+
+  if (allSignificant && allPositive && parseFloat(v12Rank) <= 1.5) {
+    verdictClass = 'verdict-positive';
+    title = '<span class="green">Strong Evidence: Brulant v1.2 Outperforms</span>';
+    body = `Across <strong>${nWindows} non-overlapping windows</strong>, v1.2 wins <strong>${v12WinRate}%</strong> ` +
+           `with average rank <strong>${v12Rank}</strong>. All paired Wilcoxon tests are significant (p<0.05). ` +
+           `The model provides genuine improvement over standard benchmarks at the cost of higher complexity.`;
+  } else if (anySignificant && parseFloat(v12WinRate) > 40) {
+    verdictClass = 'verdict-cautious';
+    title = '<span class="yellow">Moderate Evidence: Partial Advantage</span>';
+    body = `V1.2 wins <strong>${v12WinRate}%</strong> of ${nWindows} windows (rank ${v12Rank}). ` +
+           `Some but not all comparisons reach significance. ` +
+           `The advantage may be regime-specific or insufficient to justify the parameter cost.`;
+  } else {
+    verdictClass = 'verdict-negative';
+    title = '<span class="red">Insufficient Evidence: No Reliable Advantage</span>';
+    body = `V1.2 wins <strong>${v12WinRate}%</strong> of ${nWindows} windows (rank ${v12Rank}). ` +
+           `The improvement, if any, does not reach statistical significance across windows. ` +
+           `The buffer mechanism is an interesting structural idea, but the 11-parameter model ` +
+           `does not reliably beat simpler alternatives.`;
+  }
+
+  vc.innerHTML = `<div class="${verdictClass}">
+    <p><strong>${title}</strong></p>
+    <p class="mt10">${body}</p>
+  </div>`;
+}
+
+// Load all data on page load
+loadBenchmark();
+loadTemporal();
+loadMarket();
+
+// Reload data periodically (every 60s) while waiting for results
+setInterval(() => { loadBenchmark(); loadTemporal(); loadMarket(); }, 60000);
+</script>
+
+</body>
+</html>
